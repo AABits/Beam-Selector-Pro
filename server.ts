@@ -131,6 +131,17 @@ async function startServer() {
     }
   });
 
+  app.get('/api/export', (req, res) => {
+    try {
+      const types = db.prepare('SELECT * FROM beam_types').all();
+      const profiles = db.prepare('SELECT * FROM beam_profiles').all();
+      const materials = db.prepare('SELECT * FROM materials').all();
+      res.json({ types, profiles, materials });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Vite middleware
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

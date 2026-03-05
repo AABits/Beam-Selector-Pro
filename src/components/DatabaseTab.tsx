@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Download } from 'lucide-react';
 import type { BeamType, BeamProfile, Material } from '../types';
 
 export const getBeamIcon = (name: string) => {
@@ -218,6 +218,24 @@ export default function DatabaseTab() {
     }
   };
 
+  const handleExport = async () => {
+    try {
+      const res = await fetch('/api/export');
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `respaldo_vigas_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Error al exportar los datos');
+    }
+  };
+
   const currentTypeName = beamTypes.find(t => t.id === selectedTypeId)?.name.toUpperCase() || '';
   const isRound = currentTypeName.includes('REDONDO');
   const isTube = currentTypeName.includes('TUBO');
@@ -282,6 +300,15 @@ export default function DatabaseTab() {
             </div>
           </>
         )}
+        
+        <div className="p-4 border-t border-slate-200 dark:border-slate-700 mt-auto">
+          <button
+            onClick={handleExport}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-medium rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+          >
+            <Download size={16} /> Exportar Respaldo
+          </button>
+        </div>
       </div>
 
       {/* Main Content */}
