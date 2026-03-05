@@ -296,12 +296,18 @@ export default function CalculationTab() {
       .filter(res => res.actualSF >= 1.0 && res.actualDeflection <= allowDeflection_mm && res.shearSF >= 1.0)
       .sort((a, b) => a.profile.p - b.profile.p);
 
-    const suggestions = allProfiles
-      .filter(p => p.type_id !== selectedTypeId)
-      .map(p => mapToAdvancedResult(p, beamTypes.find(t => t.id === p.type_id)!))
-      .filter(res => res.actualSF >= 1.0 && res.actualDeflection <= allowDeflection_mm && res.shearSF >= 1.0)
-      .sort((a, b) => a.profile.p - b.profile.p)
-      .slice(0, 5);
+    const suggestions = Array.from(new Set(allProfiles.map(p => p.type_id)))
+      .filter(typeId => typeId !== selectedTypeId)
+      .map(typeId => {
+        const bestForType = allProfiles
+          .filter(p => p.type_id === typeId)
+          .map(p => mapToAdvancedResult(p, beamTypes.find(t => t.id === p.type_id)!))
+          .filter(res => res.actualSF >= 1.0 && res.actualDeflection <= allowDeflection_mm && res.shearSF >= 1.0)
+          .sort((a, b) => a.profile.p - b.profile.p)[0];
+        return bestForType;
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.profile.p - b.profile.p);
 
     setResults({
       maxMoment: solverResult.maxMoment / 1000000,
