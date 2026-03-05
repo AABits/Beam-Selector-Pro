@@ -4,13 +4,6 @@ import type { BeamType, BeamProfile, Material } from '../types';
 
 export const getBeamIcon = (name: string) => {
   const n = name.toUpperCase();
-  if (n.includes('IPE') || n.includes('IPN') || n.includes('HEA') || n.includes('HEB') || n.includes('W') || n.includes('I')) {
-    return (
-      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-slate-600">
-        <path d="M3 2H13V4H9V12H13V14H3V12H7V4H3V2Z" fill="currentColor"/>
-      </svg>
-    );
-  }
   if (n.includes('CUADRADO')) {
     return (
       <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-slate-600">
@@ -29,6 +22,13 @@ export const getBeamIcon = (name: string) => {
     return (
       <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-slate-600">
         <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" fill="none"/>
+      </svg>
+    );
+  }
+  if (n.includes('IPE') || n.includes('IPN') || n.includes('HEA') || n.includes('HEB') || n.includes('W') || (n.includes('I') && !n.includes('MECANICO'))) {
+    return (
+      <svg width="18" height="18" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-slate-600">
+        <path d="M3 2H13V4H9V12H13V14H3V12H7V4H3V2Z" fill="currentColor"/>
       </svg>
     );
   }

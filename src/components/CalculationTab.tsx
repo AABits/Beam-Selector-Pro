@@ -30,6 +30,8 @@ interface AdvancedResult {
   actualSF: number;
   actualDeflection: number;
   maxShear: number;
+  shearStress: number;
+  shearSF: number;
 }
 
 const ProfileCard = ({ 
@@ -88,11 +90,17 @@ const ProfileCard = ({
       </div>
       
       {expanded && (
-        <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 grid grid-cols-3 gap-4 text-sm">
+        <div className="px-4 pb-4 pt-2 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <div>
-            <span className="block text-slate-500 dark:text-slate-400 mb-1">Factor de Seguridad Real</span>
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">F.S. Flexión</span>
             <span className={`font-semibold ${result.actualSF >= 1.0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
               {result.actualSF.toFixed(2)}
+            </span>
+          </div>
+          <div>
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">F.S. Cortante</span>
+            <span className={`font-semibold ${result.shearSF >= 1.0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+              {result.shearSF.toFixed(2)}
             </span>
           </div>
           <div>
@@ -102,7 +110,7 @@ const ProfileCard = ({
             </span>
           </div>
           <div>
-            <span className="block text-slate-500 dark:text-slate-400 mb-1">Cortante Máximo (V)</span>
+            <span className="block text-slate-500 dark:text-slate-400 mb-1">Cortante Máx (V)</span>
             <span className="font-semibold text-slate-700 dark:text-slate-200">
               {result.maxShear.toFixed(2)} kN
             </span>
@@ -238,29 +246,62 @@ export default function CalculationTab() {
     const reqIx_cm4 = (solverResult.maxDeflectionWithoutEI / (E_MPa * allowDeflection_mm)) / 10000;
 
     const mapToAdvancedResult = (p: BeamProfile, type?: BeamType): AdvancedResult => {
-      const actualStress = solverResult.maxMoment / (p.wx * 1000);
+      // Add self-weight as a distributed load
+      const sw_Nmm = (p.p * 9.80665) / 1000;
+      const profileDistLoads = [...solverDistLoads, {
+        w1: sw_Nmm,
+        w2: sw_Nmm,
+        x1: 0,
+        x2: L_mm
+      }];
+
+      const profileResult = solveBeam(L_mm, solverPointLoads, profileDistLoads, supportCondition);
+
+      const actualStress = profileResult.maxMoment / (p.wx * 1000);
       const actualSF = fy_MPa / actualStress;
-      const actualDeflection = solverResult.maxDeflectionWithoutEI / (E_MPa * p.ix * 10000);
+      const actualDeflection = profileResult.maxDeflectionWithoutEI / (E_MPa * p.ix * 10000);
+
+      // Estimate Shear Area (Av)
+      let av_mm2 = p.a * 100; // default to full area if unknown
+      const name = (type?.name || beamTypes.find(t => t.id === selectedTypeId)?.name || '').toUpperCase();
+      
+      if (name.includes('IPE') || name.includes('IPN') || name.includes('HEA') || name.includes('HEB')) {
+        av_mm2 = p.h * p.e; // Web area
+      } else if (name.includes('RECTANGULAR') || name.includes('CUADRADO')) {
+        av_mm2 = 2 * p.h * p.e; // Two webs
+      } else if (name.includes('REDONDO')) {
+        av_mm2 = p.a * 100 * 0.637; // 2/pi * A
+      } else if (name.includes('UPN') || name.includes('U') || name.includes('C')) {
+        av_mm2 = p.h * p.e; // Web area
+      }
+
+      const shearStress = (profileResult.maxShear / av_mm2);
+      const allowableShear = 0.6 * fy_MPa;
+      const shearSF = allowableShear / shearStress;
 
       return {
         profile: p,
         type,
         actualSF,
         actualDeflection,
-        maxShear: solverResult.maxShear / 1000
+        maxShear: profileResult.maxShear / 1000,
+        shearStress,
+        shearSF
       };
     };
 
     const suitableForSelectedType = allProfiles
-      .filter(p => p.type_id === selectedTypeId && p.wx >= reqWx_cm3 && p.ix >= reqIx_cm4)
-      .sort((a, b) => a.p - b.p)
-      .map(p => mapToAdvancedResult(p));
+      .filter(p => p.type_id === selectedTypeId)
+      .map(p => mapToAdvancedResult(p))
+      .filter(res => res.actualSF >= 1.0 && res.actualDeflection <= allowDeflection_mm && res.shearSF >= 1.0)
+      .sort((a, b) => a.profile.p - b.profile.p);
 
     const suggestions = allProfiles
-      .filter(p => p.type_id !== selectedTypeId && p.wx >= reqWx_cm3 && p.ix >= reqIx_cm4)
-      .sort((a, b) => a.p - b.p)
-      .slice(0, 5)
-      .map(p => mapToAdvancedResult(p, beamTypes.find(t => t.id === p.type_id)!));
+      .filter(p => p.type_id !== selectedTypeId)
+      .map(p => mapToAdvancedResult(p, beamTypes.find(t => t.id === p.type_id)!))
+      .filter(res => res.actualSF >= 1.0 && res.actualDeflection <= allowDeflection_mm && res.shearSF >= 1.0)
+      .sort((a, b) => a.profile.p - b.profile.p)
+      .slice(0, 5);
 
     setResults({
       maxMoment: solverResult.maxMoment / 1000000,
@@ -585,11 +626,11 @@ export default function CalculationTab() {
                 <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{results.maxMoment.toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">kN·m</span></div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
-                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Wy Requerido</div>
+                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Wx Requerido</div>
                 <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{results.reqWy.toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">cm³</span></div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
-                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Iy Requerido</div>
+                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Ix Requerido</div>
                 <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{results.reqIy.toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">cm⁴</span></div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
