@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { solveBeam } from '../utils/beamSolver';
-import { Plus, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2, Check, X } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, Sparkles, Loader2, Check, X, Info } from 'lucide-react';
 import type { BeamType, BeamProfile, Material } from '../types';
 import FilterDropdown from './FilterDropdown';
 import { getBeamIcon } from './DatabaseTab';
@@ -79,8 +79,12 @@ const ProfileCard = ({
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <div className={`text-xl font-bold ${isOptimal ? 'text-emerald-700 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>
-              {result.profile.p} <span className="text-sm font-normal">kg/m</span>
+            <div className="text-[10px] uppercase font-bold text-slate-400 leading-none mb-1">FS Real</div>
+            <div className={`text-2xl font-black leading-none ${Math.min(result.actualSF, result.shearSF) >= 1.0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+              {Math.min(result.actualSF, result.shearSF).toFixed(2)}
+            </div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              {result.profile.p} kg/m
             </div>
           </div>
           <button className="text-slate-400 hover:text-slate-300 p-1">
@@ -166,11 +170,43 @@ export default function CalculationTab() {
     setDistributedLoads(distributedLoads.filter(d => d.id !== id));
   };
 
-  const [safetyFactor, setSafetyFactor] = useState<number>(1.5);
+  const [safetyFactor, setSafetyFactor] = useState<number>(1);
   const [deflectionLimit, setDeflectionLimit] = useState<number>(250);
 
   const [selectedProfileTypes, setSelectedProfileTypes] = useState<Set<number>>(new Set());
   const [selectedSuggestionTypes, setSelectedSuggestionTypes] = useState<Set<number>>(new Set());
+
+  // Default material mapping
+  const defaultMaterialMap: Record<string, string> = {
+    'IPE': 'ASTM A36',
+    'IPN': 'ASTM A36',
+    'UPN': 'ASTM A36',
+    'HEB': 'ASTM A36',
+    'Tubo Cuadrado Mecánico': 'ASTM A366',
+    'Tubo Cuadrado Estructural': 'ASTM A500 Gr. A',
+    'Tubo Rectangular Mecánico': 'JIS 3141 SPCC SD',
+    'Tubo Rectangular Estructural': 'ASTM A500 Gr. A',
+    'Tubo Redondo Mecánico': 'JIS 3141 SPCC SD',
+    'Tubo Redondo Estructural': 'ASTM A500 Gr. A',
+    'Tubo Cuadrado A/INOX': 'AISI 304',
+    'Tubo Rectangular A/INOX': 'AISI 304',
+    'Tubo Redondo A/INOX': 'AISI 304'
+  };
+
+  useEffect(() => {
+    if (selectedTypeId && beamTypes.length > 0 && materials.length > 0) {
+      const selectedType = beamTypes.find(t => t.id === selectedTypeId);
+      if (selectedType) {
+        const defaultMaterialName = defaultMaterialMap[selectedType.name];
+        if (defaultMaterialName) {
+          const defaultMaterial = materials.find(m => m.name === defaultMaterialName);
+          if (defaultMaterial) {
+            setSelectedMaterialId(defaultMaterial.id);
+          }
+        }
+      }
+    }
+  }, [selectedTypeId, beamTypes, materials]);
 
   const toggleProfileType = (typeId: number) => {
     const next = new Set(selectedProfileTypes);
@@ -267,8 +303,9 @@ export default function CalculationTab() {
       
       if (name.includes('IPE') || name.includes('IPN') || name.includes('HEA') || name.includes('HEB')) {
         av_mm2 = p.h * p.e; // Web area
-      } else if (name.includes('RECTANGULAR') || name.includes('CUADRADO')) {
-        av_mm2 = 2 * p.h * p.e; // Two webs
+      } else if (name.includes('RECTANGULAR') || name.includes('CUADRADO') || name.includes('INOX')) {
+        // For tubes (including INOX), shear area is roughly 2 * h * e
+        av_mm2 = 2 * p.h * p.e; 
       } else if (name.includes('REDONDO')) {
         av_mm2 = p.a * 100 * 0.637; // 2/pi * A
       } else if (name.includes('UPN') || name.includes('U') || name.includes('C')) {
@@ -294,7 +331,7 @@ export default function CalculationTab() {
       .filter(p => p.type_id === selectedTypeId)
       .map(p => mapToAdvancedResult(p))
       .filter(res => res.actualSF >= 1.0 && res.actualDeflection <= allowDeflection_mm && res.shearSF >= 1.0)
-      .sort((a, b) => a.profile.p - b.profile.p);
+      .sort((a, b) => Math.min(a.actualSF, a.shearSF) - Math.min(b.actualSF, b.shearSF));
 
     const suggestions = Array.from(new Set(allProfiles.map(p => p.type_id)))
       .filter(typeId => typeId !== selectedTypeId)
@@ -303,11 +340,11 @@ export default function CalculationTab() {
           .filter(p => p.type_id === typeId)
           .map(p => mapToAdvancedResult(p, beamTypes.find(t => t.id === p.type_id)!))
           .filter(res => res.actualSF >= 1.0 && res.actualDeflection <= allowDeflection_mm && res.shearSF >= 1.0)
-          .sort((a, b) => a.profile.p - b.profile.p)[0];
+          .sort((a, b) => Math.min(a.actualSF, a.shearSF) - Math.min(b.actualSF, b.shearSF))[0];
         return bestForType;
       })
       .filter(Boolean)
-      .sort((a, b) => a.profile.p - b.profile.p);
+      .sort((a, b) => Math.min(a.actualSF, a.shearSF) - Math.min(b.actualSF, b.shearSF));
 
     setResults({
       maxMoment: solverResult.maxMoment / 1000000,
@@ -599,9 +636,18 @@ export default function CalculationTab() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Límite Deflexión</label>
+              <label className="flex items-center gap-1.5 text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                Límite Deflexión
+                <div className="group relative">
+                  <Info size={14} className="text-slate-400 cursor-help" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-48 p-2 bg-slate-800 text-white text-[10px] rounded shadow-lg z-50 leading-tight">
+                    Flecha máxima permitida como fracción del largo (L). 
+                    Ej: L/250 significa que la viga no debe bajar más de 1/250 de su longitud.
+                  </div>
+                </div>
+              </label>
               <div className="flex items-center">
-                <span className="px-2 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-600 border border-r-0 border-slate-300 dark:border-slate-600 rounded-l-md py-2">L /</span>
+                <span className="px-3 text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-600 border border-r-0 border-slate-300 dark:border-slate-600 rounded-l-md py-2 whitespace-nowrap flex-shrink-0 font-medium">L /</span>
                 <input
                   type="number" step="any"
                   value={deflectionLimit} onChange={e => setDeflectionLimit(Number(e.target.value))}

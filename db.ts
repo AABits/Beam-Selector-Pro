@@ -52,6 +52,9 @@ if (countTypes.count === 0) {
     const infoTuboRectEst = insertType.run('Tubo Rectangular Estructural');
     const infoTuboRedMec = insertType.run('Tubo Redondo Mecánico');
     const infoTuboRedEst = insertType.run('Tubo Redondo Estructural');
+    const infoTuboCuadInox = insertType.run('Tubo Cuadrado A/INOX');
+    const infoTuboRectInox = insertType.run('Tubo Rectangular A/INOX');
+    const infoTuboRedInox = insertType.run('Tubo Redondo A/INOX');
 
     const insertProfile = db.prepare(`
       INSERT INTO beam_profiles (type_id, name, h, b, e, e1, a, ix, wx, iy, wy, p)
@@ -506,6 +509,182 @@ if (countTypes.count === 0) {
   roundEst('6 5/8"', 168.30, 4.00, 20.65, 16.21, 697.09, 82.84);
   roundEst('6 5/8"', 168.30, 5.00, 25.65, 20.14, 855.85, 101.70);
   roundEst('6 5/8"', 168.30, 6.00, 30.59, 24.02, 1008.69, 119.87);
+
+  // Tubo Cuadrado A/INOX
+  const sqInox = (b: number, e: number, a: number, p: number, i: number, w: number) => {
+    const round = (val: number) => Math.round(val * 1000) / 1000;
+    insertProfile.run(infoTuboCuadInox.lastInsertRowid, `${b}x${b}x${e}`, b, b, e, 0, round(a), round(i), round(w), round(i), round(w), p);
+  };
+
+  sqInox(12, 1, 0.44, 0.35, 0.089, 0.149);
+  sqInox(12, 1.2, 0.518, 0.41, 0.102, 0.170);
+  sqInox(12, 1.5, 0.63, 0.50, 0.118, 0.197);
+  sqInox(12, 2, 0.80, 0.64, 0.139, 0.231);
+  
+  sqInox(15, 1, 0.56, 0.44, 0.184, 0.245);
+  sqInox(15, 1.2, 0.662, 0.53, 0.212, 0.282);
+  sqInox(15, 1.5, 0.81, 0.64, 0.249, 0.332);
+  sqInox(15, 2, 1.04, 0.83, 0.300, 0.400);
+  
+  sqInox(20, 1, 0.76, 0.60, 0.459, 0.459);
+  sqInox(20, 1.2, 0.902, 0.72, 0.534, 0.534);
+  sqInox(20, 1.5, 1.11, 0.88, 0.637, 0.637);
+  sqInox(20, 2, 1.44, 1.14, 0.787, 0.787);
+  
+  sqInox(25, 1, 0.96, 0.76, 0.923, 0.739);
+  sqInox(25, 1.2, 1.142, 0.91, 1.081, 0.865);
+  sqInox(25, 1.5, 1.41, 1.12, 1.303, 1.042);
+  sqInox(25, 2, 1.84, 1.46, 1.635, 1.308);
+  
+  sqInox(30, 1, 1.16, 0.92, 1.628, 1.085);
+  sqInox(30, 1.2, 1.382, 1.10, 1.914, 1.276);
+  sqInox(30, 1.5, 1.71, 1.36, 2.321, 1.548);
+  sqInox(30, 2, 2.24, 1.78, 2.942, 1.961);
+  
+  sqInox(40, 1, 1.56, 1.24, 3.957, 1.979);
+  sqInox(40, 1.2, 1.862, 1.48, 4.678, 2.339);
+  sqInox(40, 1.5, 2.31, 1.83, 5.715, 2.858);
+  sqInox(40, 2, 3.04, 2.41, 7.337, 3.668);
+  
+  sqInox(50, 1, 1.96, 1.56, 7.847, 3.139);
+  sqInox(50, 1.2, 2.342, 1.86, 9.306, 3.722);
+  sqInox(50, 1.5, 2.91, 2.31, 11.419, 4.568);
+  sqInox(50, 2, 3.84, 3.05, 14.711, 5.908);
+  sqInox(50, 3, 5.64, 4.42, 20.849, 8.340);
+  
+  sqInox(75, 2, 5.84, 4.63, 51.908, 13.842);
+  sqInox(75, 3, 8.64, 6.60, 74.779, 19.941);
+  
+  sqInox(100, 2, 7.84, 6.22, 125.545, 25.109);
+  sqInox(100, 3, 11.64, 8.96, 182.709, 36.542);
+  
+  sqInox(150, 2.5, 14.75, 11.70, 534.995, 71.333);
+
+  // Tubo Rectangular A/INOX
+  const rectInox = (h: number, b: number, e: number, p: number) => {
+    const a = (h * b - (h - 2 * e) * (b - 2 * e)) / 100;
+    const ix = (b * Math.pow(h, 3) - (b - 2 * e) * Math.pow(h - 2 * e, 3)) / 120000;
+    const wx = ix / (h / 20);
+    const iy = (h * Math.pow(b, 3) - (h - 2 * e) * Math.pow(b - 2 * e, 3)) / 120000;
+    const wy = iy / (b / 20);
+    const round = (val: number) => Math.round(val * 1000) / 1000;
+    insertProfile.run(infoTuboRectInox.lastInsertRowid, `${h}x${b}x${e}`, h, b, e, 0, round(a), round(ix), round(wx), round(iy), round(wy), p);
+  };
+
+  rectInox(25, 12, 1, 0.56);
+  rectInox(25, 12, 1.2, 0.66);
+  rectInox(25, 12, 1.5, 0.81);
+  rectInox(25, 12, 2, 1.05);
+
+  rectInox(40, 20, 1, 0.92);
+  rectInox(40, 20, 1.2, 1.10);
+  rectInox(40, 20, 1.5, 1.36);
+  rectInox(40, 20, 2, 1.78);
+
+  rectInox(50, 25, 1, 1.16);
+  rectInox(50, 25, 1.2, 1.38);
+  rectInox(50, 25, 1.5, 1.71);
+  rectInox(50, 25, 2, 2.25);
+
+  rectInox(60, 40, 2, 3.05);
+  rectInox(60, 40, 3, 4.25);
+
+  rectInox(70, 30, 2, 3.05);
+  rectInox(70, 30, 3, 4.25);
+
+  rectInox(80, 40, 2, 3.68);
+  rectInox(80, 40, 3, 5.19);
+
+  rectInox(100, 50, 2, 4.63);
+  rectInox(100, 50, 3, 6.60);
+
+  rectInox(150, 50, 2, 6.22);
+  rectInox(150, 50, 3, 8.96);
+
+  rectInox(150, 100, 2, 7.80);
+  rectInox(150, 100, 3, 11.31);
+
+  rectInox(200, 100, 2, 9.39);
+  rectInox(200, 100, 3, 13.63);
+
+  // Tubo Redondo A/INOX
+  const roundInox = (label: string, d: number, e: number, p: number) => {
+    const di = d - 2 * e;
+    const a = (Math.PI / 4) * (Math.pow(d, 2) - Math.pow(di, 2)) / 100;
+    const i = (Math.PI / 64) * (Math.pow(d, 4) - Math.pow(di, 4)) / 10000;
+    const w = i / (d / 20);
+    const round = (val: number) => Math.round(val * 1000) / 1000;
+    insertProfile.run(infoTuboRedInox.lastInsertRowid, `${label}`, d, 0, e, 0, round(a), round(i), round(w), round(i), round(w), p);
+  };
+
+  roundInox('3/8" (1.0mm)', 9.52, 1, 0.21);
+  roundInox('3/8" (1.2mm)', 9.52, 1.2, 0.25);
+  roundInox('3/8" (1.5mm)', 9.52, 1.5, 0.30);
+  roundInox('3/8" (2.0mm)', 9.52, 2, 0.38);
+
+  roundInox('1/2" (1.0mm)', 12.7, 1, 0.29);
+  roundInox('1/2" (1.2mm)', 12.7, 1.2, 0.34);
+  roundInox('1/2" (1.5mm)', 12.7, 1.5, 0.42);
+  roundInox('1/2" (2.0mm)', 12.7, 2, 0.53);
+
+  roundInox('5/8" (1.0mm)', 15.9, 1, 0.37);
+  roundInox('5/8" (1.2mm)', 15.9, 1.2, 0.44);
+  roundInox('5/8" (1.5mm)', 15.9, 1.5, 0.54);
+  roundInox('5/8" (2.0mm)', 15.9, 2, 0.69);
+
+  roundInox('3/4" (1.0mm)', 19.1, 1, 0.45);
+  roundInox('3/4" (1.2mm)', 19.1, 1.2, 0.54);
+  roundInox('3/4" (1.5mm)', 19.1, 1.5, 0.66);
+  roundInox('3/4" (2.0mm)', 19.1, 2, 0.85);
+
+  roundInox('7/8" (1.0mm)', 22, 1, 0.52);
+  roundInox('7/8" (1.2mm)', 22, 1.2, 0.62);
+  roundInox('7/8" (1.5mm)', 22, 1.5, 0.77);
+  roundInox('7/8" (2.0mm)', 22, 2, 1.00);
+
+  roundInox('1" (1.0mm)', 25.4, 1, 0.61);
+  roundInox('1" (1.2mm)', 25, 1.2, 0.72);
+  roundInox('1" (1.5mm)', 25.4, 1.5, 0.89);
+  roundInox('1" (2.0mm)', 25.4, 2, 1.17);
+
+  roundInox('1 1/4" (1.0mm)', 31.8, 1, 0.77);
+  roundInox('1 1/4" (1.2mm)', 31.8, 1.2, 0.92);
+  roundInox('1 1/4" (1.5mm)', 31.8, 1.5, 1.13);
+  roundInox('1 1/4" (2.0mm)', 31.8, 2, 1.49);
+
+  roundInox('1 1/2" (1.0mm)', 38.1, 1, 0.92);
+  roundInox('1 1/2" (1.2mm)', 38.1, 1.2, 1.10);
+  roundInox('1 1/2" (1.5mm)', 38.1, 1.5, 1.37);
+  roundInox('1 1/2" (2.0mm)', 38.1, 2, 1.80);
+
+  roundInox('1 3/4" (1.0mm)', 44.5, 1, 1.61);
+  roundInox('1 3/4" (1.2mm)', 44.5, 1.2, 1.30);
+  roundInox('1 3/4" (1.5mm)', 44.5, 1.5, 1.61);
+  roundInox('1 3/4" (2.0mm)', 44.5, 2, 2.12);
+
+  roundInox('2" (1.0mm)', 50.8, 1, 1.24);
+  roundInox('2" (1.2mm)', 50.8, 1.2, 1.48);
+  roundInox('2" (1.5mm)', 50.8, 1.5, 1.84);
+  roundInox('2" (2.0mm)', 50.8, 2, 2.43);
+  roundInox('2" (3.0mm)', 50.8, 3, 3.54);
+
+  roundInox('2 1/2" (1.0mm)', 63.5, 1, 1.56);
+  roundInox('2 1/2" (1.2mm)', 63.5, 1.2, 1.86);
+  roundInox('2 1/2" (1.5mm)', 63.5, 1.5, 2.32);
+  roundInox('2 1/2" (2.0mm)', 63.5, 2, 3.06);
+  roundInox('2 1/2" (3.0mm)', 63.5, 3, 4.48);
+
+  roundInox('3" (2.0mm)', 76.2, 2, 3.70);
+  roundInox('3" (3.0mm)', 76.2, 3, 5.42);
+
+  roundInox('4" (2.0mm)', 101.6, 2, 4.96);
+  roundInox('4" (3.0mm)', 101.6, 3, 7.29);
+
+  roundInox('5" (2.0mm)', 127, 2, 6.23);
+  roundInox('5" (3.0mm)', 127, 3, 9.17);
+
+  roundInox('6" (2.0mm)', 152.4, 2, 7.49);
+  roundInox('6" (3.0mm)', 152.4, 3, 11.05);
   })();
 }
 
@@ -515,8 +694,13 @@ if (countMaterials.count === 0) {
     const insertMaterial = db.prepare('INSERT INTO materials (name, fy, e) VALUES (?, ?, ?)');
     insertMaterial.run('ASTM A36', 250, 200);
     insertMaterial.run('ASTM A572 Gr. 50', 345, 200);
+    insertMaterial.run('ASTM A500 Gr. A', 230, 200);
     insertMaterial.run('ASTM A500 Gr. B', 290, 200);
     insertMaterial.run('ASTM A500 Gr. C', 315, 200);
+    insertMaterial.run('ASTM A366', 250, 200);
+    insertMaterial.run('JIS 3141 SPCC SD', 240, 200);
+    insertMaterial.run('AISI 304', 215, 193);
+    insertMaterial.run('AISI 316', 205, 193);
     insertMaterial.run('S275', 275, 210);
     insertMaterial.run('S355', 355, 210);
   })();
