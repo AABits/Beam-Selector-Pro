@@ -2,22 +2,26 @@ export function solveBeam(
   L: number, // mm
   pointLoads: { P: number, a: number }[], // N, mm
   distributedLoads: { w1: number, w2: number, x1: number, x2: number }[], // N/mm, mm
-  supportCondition: 'simply_supported' | 'cantilever' | 'propped_cantilever' | 'fixed_fixed'
+  supports: { x: number, type: 'pinned' | 'roller' | 'fixed' }[]
 ) {
+  if (L <= 0 || supports.length === 0) {
+    return { maxMoment: 0, maxShear: 0, maxDeflectionWithoutEI: 0 };
+  }
+
   const N = 500;
   const dx = L / N;
   
-  const V_loads_left = new Float64Array(N + 1);
-  const V_loads_right = new Float64Array(N + 1);
+  // 1. Precalculate I1 and I2 for loads (Macaulay-like integration)
+  const I1_loads = new Float64Array(N + 1);
+  const I2_loads = new Float64Array(N + 1);
   const M_loads = new Float64Array(N + 1);
-  
+  const V_loads = new Float64Array(N + 1);
+
   for (let i = 0; i <= N; i++) {
     const x = i * dx;
-    let v_l = 0;
-    let v_r = 0;
+    let v = 0;
     let m = 0;
     
-    // Distributed loads
     for (const dl of distributedLoads) {
       if (x > dl.x1) {
         const x_end = Math.min(x, dl.x2);
@@ -26,88 +30,199 @@ export function solveBeam(
         const u_end = x_end - dl.x1;
         const D = x - dl.x1;
         
-        const dv = A * u_end + 0.5 * B * u_end * u_end;
-        v_l += dv;
-        v_r += dv;
+        v += A * u_end + 0.5 * B * u_end * u_end;
         m += A * D * u_end - 0.5 * A * u_end * u_end + 0.5 * B * D * u_end * u_end - (B / 3) * u_end * u_end * u_end;
       }
     }
 
-    // Point loads
     for (const pl of pointLoads) {
       if (x > pl.a) {
-        v_l += pl.P;
-        v_r += pl.P;
+        v += pl.P;
         m += pl.P * (x - pl.a);
-      } else if (Math.abs(x - pl.a) < 1e-7) {
-        // exactly at x
-        v_r += pl.P;
       }
     }
     
-    V_loads_left[i] = v_l;
-    V_loads_right[i] = v_r;
+    V_loads[i] = v;
     M_loads[i] = m;
   }
   
-  const I1 = new Float64Array(N + 1);
-  const I2 = new Float64Array(N + 1);
-  I1[0] = 0;
-  I2[0] = 0;
   for (let i = 1; i <= N; i++) {
-    I1[i] = I1[i-1] + 0.5 * (M_loads[i-1] + M_loads[i]) * dx;
-    I2[i] = I2[i-1] + 0.5 * (I1[i-1] + I1[i]) * dx;
+    I1_loads[i] = I1_loads[i-1] + 0.5 * (M_loads[i-1] + M_loads[i]) * dx;
+    I2_loads[i] = I2_loads[i-1] + 0.5 * (I1_loads[i-1] + I1_loads[i]) * dx;
   }
-  
-  const I1_L = I1[N];
-  const I2_L = I2[N];
-  const M_loads_L = M_loads[N];
-  const V_loads_L = V_loads_right[N];
-  
-  let R_L = 0, M_L = 0, C1 = 0, C2 = 0;
-  
-  if (supportCondition === 'simply_supported') {
-    C2 = 0;
-    M_L = 0;
-    R_L = M_loads_L / L;
-    C1 = (I2_L - R_L * Math.pow(L, 3) / 6) / L;
-  } else if (supportCondition === 'cantilever') {
-    C2 = 0;
-    C1 = 0;
-    R_L = V_loads_L;
-    M_L = R_L * L - M_loads_L;
-  } else if (supportCondition === 'fixed_fixed') {
-    C2 = 0;
-    C1 = 0;
-    R_L = (I1_L * L / 2 - I2_L) / (Math.pow(L, 3) / 12);
-    M_L = R_L * L / 2 - I1_L / L;
-  } else if (supportCondition === 'propped_cantilever') {
-    C2 = 0;
-    C1 = 0;
-    R_L = (M_loads_L * Math.pow(L, 2) / 2 - I2_L) / (Math.pow(L, 3) / 3);
-    M_L = R_L * L - M_loads_L;
+
+  // 2. Set up linear system for reactions and integration constants C1, C2
+  // Unknowns: [R1, R2, ..., Rn, M1, M2, ..., Mm, C1, C2]
+  // Reaction components: Force R_i at x_i, Moment M_j at x_j
+  const reactionComponents: { x: number, type: 'force' | 'moment' }[] = [];
+  for (const s of supports) {
+    if (s.type === 'pinned' || s.type === 'roller') {
+      reactionComponents.push({ x: s.x, type: 'force' });
+    } else if (s.type === 'fixed') {
+      reactionComponents.push({ x: s.x, type: 'force' });
+      reactionComponents.push({ x: s.x, type: 'moment' });
+    }
   }
-  
+
+  const numReactions = reactionComponents.length;
+  const numUnknowns = numReactions + 2;
+  const A = Array.from({ length: numUnknowns }, () => new Float64Array(numUnknowns));
+  const B = new Float64Array(numUnknowns);
+
+  // Equilibrium Equations
+  // 1. Sum of Forces = 0
+  for (let j = 0; j < numReactions; j++) {
+    if (reactionComponents[j].type === 'force') A[0][j] = 1;
+    else A[0][j] = 0;
+  }
+  B[0] = -V_loads[N];
+
+  // 2. Sum of Moments about x=0 = 0
+  // Sum(R_k * x_k) + Sum(M_k) + Sum(P_i * a_i) = 0
+  // Sum(P_i * a_i) = V_loads[N] * L - M_loads[N]
+  for (let j = 0; j < numReactions; j++) {
+    if (reactionComponents[j].type === 'force') A[1][j] = reactionComponents[j].x;
+    else A[1][j] = 1;
+  }
+  B[1] = -(V_loads[N] * L - M_loads[N]);
+
+  // Boundary Conditions
+  let eqIdx = 2;
+  for (const s of supports) {
+    // v(x_s) = 0
+    // C2 + C1*x_s + I2_loads(x_s) + sum(R_i * <x_s - x_i>^3 / 6) + sum(M_j * <x_s - x_j>^2 / 2) = 0
+    const x_s = s.x;
+    for (let j = 0; j < numReactions; j++) {
+      const x_j = reactionComponents[j].x;
+      const type_j = reactionComponents[j].type;
+      if (x_s > x_j) {
+        if (type_j === 'force') A[eqIdx][j] = Math.pow(x_s - x_j, 3) / 6;
+        else A[eqIdx][j] = Math.pow(x_s - x_j, 2) / 2;
+      }
+    }
+    A[eqIdx][numReactions] = x_s; // C1
+    A[eqIdx][numReactions + 1] = 1; // C2
+    
+    // Find I2_loads at x_s using interpolation
+    const idx = Math.min(Math.floor(x_s / dx), N - 1);
+    const frac = (x_s - idx * dx) / dx;
+    B[eqIdx] = -(I2_loads[idx] + frac * (I2_loads[idx + 1] - I2_loads[idx]));
+    eqIdx++;
+
+    if (s.type === 'fixed') {
+      // theta(x_s) = 0
+      // C1 + I1_loads(x_s) + sum(R_i * <x_s - x_i>^2 / 2) + sum(M_j * <x_s - x_j>^1) = 0
+      for (let j = 0; j < numReactions; j++) {
+        const x_j = reactionComponents[j].x;
+        const type_j = reactionComponents[j].type;
+        if (x_s > x_j) {
+          if (type_j === 'force') A[eqIdx][j] = Math.pow(x_s - x_j, 2) / 2;
+          else A[eqIdx][j] = (x_s - x_j);
+        }
+      }
+      A[eqIdx][numReactions] = 1; // C1
+      A[eqIdx][numReactions + 1] = 0; // C2
+      
+      const idx = Math.min(Math.floor(x_s / dx), N - 1);
+      const frac = (x_s - idx * dx) / dx;
+      B[eqIdx] = -(I1_loads[idx] + frac * (I1_loads[idx + 1] - I1_loads[idx]));
+      eqIdx++;
+    }
+  }
+
+  // Solve A*X = B using Gaussian elimination
+  const X = solveLinearSystem(A, B);
+  if (!X) return { maxMoment: 0, maxShear: 0, maxDeflectionWithoutEI: 0, reactions: [], reactionComponents: [] };
+
+  const reactions = X.slice(0, numReactions);
+  const C1 = X[numReactions];
+  const C2 = X[numReactions + 1];
+
+  // 3. Calculate final results
   let max_M = 0;
   let max_V = 0;
   let max_EI_v = 0;
-  
+
   for (let i = 0; i <= N; i++) {
     const x = i * dx;
-    const V_l = R_L - V_loads_left[i];
-    const V_r = R_L - V_loads_right[i];
-    const M = -M_L + R_L * x - M_loads[i];
-    const EI_v = -M_L * x * x / 2 + R_L * x * x * x / 6 - I2[i] + C1 * x + C2;
-    
+    // V(x) = V_loads(x) + sum(R_k)
+    // M(x) = M_loads(x) + sum(R_k * <x - x_k>) + sum(M_k)
+    // EI_v(x) = I2_loads(x) + sum(R_k * <x - x_k>^3 / 6) + sum(M_k * <x - x_k>^2 / 2) + C1*x + C2
+    let V = V_loads[i];
+    let M = M_loads[i];
+    let EI_v = I2_loads[i] + C1 * x + C2;
+
+    for (let j = 0; j < numReactions; j++) {
+      const x_j = reactionComponents[j].x;
+      const type_j = reactionComponents[j].type;
+      const val = reactions[j];
+      if (x > x_j) {
+        if (type_j === 'force') {
+          V += val;
+          M += val * (x - x_j);
+          EI_v += val * Math.pow(x - x_j, 3) / 6;
+        } else {
+          M += val;
+          EI_v += val * Math.pow(x - x_j, 2) / 2;
+        }
+      }
+    }
+
     if (Math.abs(M) > max_M) max_M = Math.abs(M);
-    if (Math.abs(V_l) > max_V) max_V = Math.abs(V_l);
-    if (Math.abs(V_r) > max_V) max_V = Math.abs(V_r);
+    if (Math.abs(V) > max_V) max_V = Math.abs(V);
     if (Math.abs(EI_v) > max_EI_v) max_EI_v = Math.abs(EI_v);
   }
-  
+
   return {
-    maxMoment: max_M, // N*mm
-    maxShear: max_V, // N
-    maxDeflectionWithoutEI: max_EI_v // N*mm^3
+    maxMoment: max_M,
+    maxShear: max_V,
+    maxDeflectionWithoutEI: max_EI_v,
+    reactions: Array.from(reactions),
+    reactionComponents
   };
+}
+
+function solveLinearSystem(A: Float64Array[], B: Float64Array): Float64Array | null {
+  const n = B.length;
+  for (let i = 0; i < n; i++) {
+    // Pivot selection
+    let max = Math.abs(A[i][i]);
+    let maxRow = i;
+    for (let k = i + 1; k < n; k++) {
+      if (Math.abs(A[k][i]) > max) {
+        max = Math.abs(A[k][i]);
+        maxRow = k;
+      }
+    }
+
+    // Swap rows
+    const tempA = A[maxRow];
+    A[maxRow] = A[i];
+    A[i] = tempA;
+    const tempB = B[maxRow];
+    B[maxRow] = B[i];
+    B[i] = tempB;
+
+    if (Math.abs(A[i][i]) < 1e-12) return null; // Singular matrix
+
+    // Elimination
+    for (let k = i + 1; k < n; k++) {
+      const c = -A[k][i] / A[i][i];
+      for (let j = i; j < n; j++) {
+        if (i === j) A[k][j] = 0;
+        else A[k][j] += c * A[i][j];
+      }
+      B[k] += c * B[i];
+    }
+  }
+
+  // Back substitution
+  const X = new Float64Array(n);
+  for (let i = n - 1; i >= 0; i--) {
+    X[i] = B[i] / A[i][i];
+    for (let k = i - 1; k >= 0; k--) {
+      B[k] -= A[k][i] * X[i];
+    }
+  }
+  return X;
 }

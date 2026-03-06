@@ -7,10 +7,13 @@ import React, { useState, useEffect } from 'react';
 import { Database, Calculator, Sun, Moon } from 'lucide-react';
 import DatabaseTab from './components/DatabaseTab';
 import CalculationTab from './components/CalculationTab';
+import EvidenceTab from './components/EvidenceTab';
 import InfoPopup from './components/InfoPopup';
+import { CalculationProvider } from './context/CalculationContext';
+import { FileText } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'database' | 'calculation'>('calculation');
+  const [activeTab, setActiveTab] = useState<'database' | 'calculation' | 'evidence'>('calculation');
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -46,6 +49,17 @@ export default function App() {
                 Cálculo
               </button>
               <button
+                onClick={() => setActiveTab('evidence')}
+                className={`px-3 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors ${
+                  activeTab === 'evidence'
+                    ? 'bg-amber-500 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <FileText size={18} />
+                Evidencias
+              </button>
+              <button
                 onClick={() => setActiveTab('database')}
                 className={`px-3 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-colors ${
                   activeTab === 'database'
@@ -71,8 +85,16 @@ export default function App() {
 
       {/* Main Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 overflow-hidden flex flex-col relative">
-        {activeTab === 'database' ? <DatabaseTab /> : <CalculationTab />}
-        <InfoPopup />
+        <CalculationProvider>
+          {activeTab === 'database' ? (
+            <DatabaseTab />
+          ) : activeTab === 'evidence' ? (
+            <EvidenceTab />
+          ) : (
+            <CalculationTab />
+          )}
+          <InfoPopup />
+        </CalculationProvider>
       </main>
     </div>
   );

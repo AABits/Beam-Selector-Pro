@@ -26,3 +26,20 @@ export interface Material {
   e: number;
 }
 
+export interface Support {
+  id: string;
+  type: 'pinned' | 'roller' | 'fixed';
+  position: number;
+  positionUnit: string;
+}
+
+export interface AdvancedResult {
+  profile: BeamProfile;
+  type?: BeamType;
+  actualSF: number;
+  actualDeflection: number;
+  maxShear: number;
+  shearStress: number;
+  shearSF: number;
+}
+

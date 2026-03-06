@@ -7,6 +7,31 @@ import db from './db';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Prepared statements for better performance
+const statements = {
+  getBeamTypes: db.prepare('SELECT * FROM beam_types'),
+  insertBeamType: db.prepare('INSERT INTO beam_types (name) VALUES (?)'),
+  deleteBeamType: db.prepare('DELETE FROM beam_types WHERE id = ?'),
+  
+  getBeamProfiles: db.prepare('SELECT * FROM beam_profiles'),
+  getBeamProfilesByType: db.prepare('SELECT * FROM beam_profiles WHERE type_id = ?'),
+  insertBeamProfile: db.prepare(`
+    INSERT INTO beam_profiles (type_id, name, h, b, e, e1, a, ix, wx, iy, wy, p)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `),
+  updateBeamProfile: db.prepare(`
+    UPDATE beam_profiles 
+    SET name = ?, h = ?, b = ?, e = ?, e1 = ?, a = ?, ix = ?, wx = ?, iy = ?, wy = ?, p = ?
+    WHERE id = ?
+  `),
+  deleteBeamProfile: db.prepare('DELETE FROM beam_profiles WHERE id = ?'),
+  
+  getMaterials: db.prepare('SELECT * FROM materials'),
+  insertMaterial: db.prepare('INSERT INTO materials (name, fy, e) VALUES (?, ?, ?)'),
+  updateMaterial: db.prepare('UPDATE materials SET name = ?, fy = ?, e = ? WHERE id = ?'),
+  deleteMaterial: db.prepare('DELETE FROM materials WHERE id = ?'),
+};
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -16,8 +41,7 @@ async function startServer() {
   // API Routes
   app.get('/api/beam-types', (req, res) => {
     try {
-      const types = db.prepare('SELECT * FROM beam_types').all();
-      res.json(types);
+      res.json(statements.getBeamTypes.all());
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -25,8 +49,9 @@ async function startServer() {
 
   app.post('/api/beam-types', (req, res) => {
     const { name } = req.body;
+    if (!name) return res.status(400).json({ error: 'Name is required' });
     try {
-      const info = db.prepare('INSERT INTO beam_types (name) VALUES (?)').run(name);
+      const info = statements.insertBeamType.run(name);
       res.json({ id: info.lastInsertRowid, name });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
@@ -34,9 +59,8 @@ async function startServer() {
   });
 
   app.delete('/api/beam-types/:id', (req, res) => {
-    const { id } = req.params;
     try {
-      db.prepare('DELETE FROM beam_types WHERE id = ?').run(id);
+      statements.deleteBeamType.run(req.params.id);
       res.json({ success: true });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
@@ -46,13 +70,11 @@ async function startServer() {
   app.get('/api/beam-profiles', (req, res) => {
     const { type_id } = req.query;
     try {
-      let profiles;
       if (type_id) {
-        profiles = db.prepare('SELECT * FROM beam_profiles WHERE type_id = ?').all(type_id);
+        res.json(statements.getBeamProfilesByType.all(type_id));
       } else {
-        profiles = db.prepare('SELECT * FROM beam_profiles').all();
+        res.json(statements.getBeamProfiles.all());
       }
-      res.json(profiles);
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -61,11 +83,8 @@ async function startServer() {
   app.post('/api/beam-profiles', (req, res) => {
     const { type_id, name, h, b, e, e1, a, ix, wx, iy, wy, p } = req.body;
     try {
-      const info = db.prepare(`
-        INSERT INTO beam_profiles (type_id, name, h, b, e, e1, a, ix, wx, iy, wy, p)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(type_id, name, h, b, e, e1, a, ix, wx, iy, wy, p);
-      res.json({ id: info.lastInsertRowid, type_id, name, h, b, e, e1, a, ix, wx, iy, wy, p });
+      const info = statements.insertBeamProfile.run(type_id, name, h, b, e, e1, a, ix, wx, iy, wy, p);
+      res.json({ id: info.lastInsertRowid, ...req.body });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
     }
@@ -75,11 +94,7 @@ async function startServer() {
     const { id } = req.params;
     const { name, h, b, e, e1, a, ix, wx, iy, wy, p } = req.body;
     try {
-      db.prepare(`
-        UPDATE beam_profiles 
-        SET name = ?, h = ?, b = ?, e = ?, e1 = ?, a = ?, ix = ?, wx = ?, iy = ?, wy = ?, p = ?
-        WHERE id = ?
-      `).run(name, h, b, e, e1, a, ix, wx, iy, wy, p, id);
+      statements.updateBeamProfile.run(name, h, b, e, e1, a, ix, wx, iy, wy, p, id);
       res.json({ success: true });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
@@ -87,9 +102,8 @@ async function startServer() {
   });
 
   app.delete('/api/beam-profiles/:id', (req, res) => {
-    const { id } = req.params;
     try {
-      db.prepare('DELETE FROM beam_profiles WHERE id = ?').run(id);
+      statements.deleteBeamProfile.run(req.params.id);
       res.json({ success: true });
     } catch (e: any) {
       res.status(400).json({ error: e.message });
@@ -98,8 +112,7 @@ async function startServer() {
 
   app.get('/api/materials', (req, res) => {
     try {
-      const materials = db.prepare('SELECT * FROM materials').all();
-      res.json(materials);
+      res.json(statements.getMaterials.all());
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
@@ -108,7 +121,7 @@ async function startServer() {
   app.post('/api/materials', (req, res) => {
     const { name, fy, e } = req.body;
     try {
-      const result = db.prepare('INSERT INTO materials (name, fy, e) VALUES (?, ?, ?)').run(name, fy, e);
+      const result = statements.insertMaterial.run(name, fy, e);
       res.json({ id: result.lastInsertRowid, name, fy, e });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
@@ -119,7 +132,7 @@ async function startServer() {
     const { id } = req.params;
     const { name, fy, e } = req.body;
     try {
-      db.prepare('UPDATE materials SET name = ?, fy = ?, e = ? WHERE id = ?').run(name, fy, e, id);
+      statements.updateMaterial.run(name, fy, e, id);
       res.json({ success: true });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
@@ -127,9 +140,8 @@ async function startServer() {
   });
 
   app.delete('/api/materials/:id', (req, res) => {
-    const { id } = req.params;
     try {
-      db.prepare('DELETE FROM materials WHERE id = ?').run(id);
+      statements.deleteMaterial.run(req.params.id);
       res.json({ success: true });
     } catch (err: any) {
       res.status(400).json({ error: err.message });
@@ -138,10 +150,11 @@ async function startServer() {
 
   app.get('/api/export', (req, res) => {
     try {
-      const types = db.prepare('SELECT * FROM beam_types').all();
-      const profiles = db.prepare('SELECT * FROM beam_profiles').all();
-      const materials = db.prepare('SELECT * FROM materials').all();
-      res.json({ types, profiles, materials });
+      res.json({ 
+        types: statements.getBeamTypes.all(), 
+        profiles: statements.getBeamProfiles.all(), 
+        materials: statements.getMaterials.all() 
+      });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
     }
