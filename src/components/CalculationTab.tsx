@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { solveBeam } from '../utils/beamSolver';
-import { Plus, Trash2, Sparkles, Loader2, Check, X, Info, ArrowDown, ArrowUp } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Loader2, Check, X, Info, ArrowDown, ArrowUp, Calculator, BarChart2, AlertTriangle } from 'lucide-react';
 import type { BeamType, BeamProfile, Material, AdvancedResult } from '../types';
 import FilterDropdown from './FilterDropdown';
 import ProfileCard from './ProfileCard';
 import { getBeamIcon } from '../utils/icons';
 import { convertLengthToMm, convertForceToN, convertDistributedLoadToNmm } from '../utils/units';
 import { useCalculation } from '../context/CalculationContext';
+import BeamVisualizer from './BeamVisualizer';
 
 interface PointLoad {
   id: string;
@@ -28,6 +29,14 @@ interface DistributedLoad {
   direction: 'down' | 'up';
 }
 
+interface MomentLoad {
+  id: string;
+  magnitude: number;
+  position: number;
+  positionUnit: string;
+  direction: 'ccw' | 'cw';
+}
+
 interface Support {
   id: string;
   type: 'pinned' | 'roller' | 'fixed';
@@ -35,9 +44,14 @@ interface Support {
   positionUnit: string;
 }
 
-export default function CalculationTab() {
+interface CalculationTabProps {
+  onGoToEvidence?: () => void;
+}
+
+export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) {
   const { setState: setGlobalState } = useCalculation();
   const [beamTypes, setBeamTypes] = useState<BeamType[]>([]);
+  const [allProfiles, setAllProfiles] = useState<BeamProfile[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState<number | ''>('');
   
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -51,6 +65,8 @@ export default function CalculationTab() {
   const [supports, setSupports] = useState<Support[]>([]);
   const [pointLoads, setPointLoads] = useState<PointLoad[]>([]);
   const [distributedLoads, setDistributedLoads] = useState<DistributedLoad[]>([]);
+  const [momentLoads, setMomentLoads] = useState<MomentLoad[]>([]);
+  const [includeSelfWeight, setIncludeSelfWeight] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
   // Sync supports with supportCondition and spanLength
@@ -184,18 +200,22 @@ export default function CalculationTab() {
     L_mm: number,
     solverSupports: any[],
     fy_MPa: number,
-    E_MPa: number
+    E_MPa: number,
+    solverMomentLoads: any[] = []
   ): AdvancedResult => {
-    // Add self-weight as a distributed load
-    const sw_Nmm = (p.p * 9.80665) / 1000;
-    const profileDistLoads = [...solverDistLoads, {
-      w1: sw_Nmm,
-      w2: sw_Nmm,
-      x1: 0,
-      x2: L_mm
-    }];
+    // Add self-weight as a distributed load if enabled
+    let profileDistLoads = [...solverDistLoads];
+    if (includeSelfWeight) {
+      const sw_Nmm = (p.p * 9.80665) / 1000;
+      profileDistLoads.push({
+        w1: sw_Nmm,
+        w2: sw_Nmm,
+        x1: 0,
+        x2: L_mm
+      });
+    }
 
-    const profileResult = solveBeam(L_mm, solverPointLoads, profileDistLoads, solverSupports);
+    const profileResult = solveBeam(L_mm, solverPointLoads, profileDistLoads, solverSupports, solverMomentLoads);
 
     const actualStress = profileResult.maxMoment / (p.wx * 1000);
     const actualSF = fy_MPa / actualStress;
@@ -219,16 +239,28 @@ export default function CalculationTab() {
     const allowableShear = 0.6 * fy_MPa;
     const shearSF = allowableShear / shearStress;
 
+    const vonMisesStress = Math.sqrt(Math.pow(actualStress, 2) + 3 * Math.pow(shearStress, 2));
+    const vonMisesSF = fy_MPa / vonMisesStress;
+
     return {
       profile: p,
       type,
       actualSF,
       actualDeflection,
+      maxMoment: profileResult.maxMoment / 1000000,
       maxShear: profileResult.maxShear / 1000,
       shearStress,
-      shearSF
+      shearSF,
+      vonMisesStress,
+      vonMisesSF,
+      maxMomentX: profileResult.maxMomentX,
+      maxShearX: profileResult.maxShearX,
+      maxDeflectionX: profileResult.maxDeflectionX,
+      reactions: profileResult.reactions,
+      reactionComponents: profileResult.reactionComponents,
+      points: profileResult.points
     };
-  }, [beamTypes, selectedTypeId]);
+  }, [beamTypes, selectedTypeId, includeSelfWeight]);
 
   useEffect(() => {
     fetch('/api/beam-types')
@@ -244,6 +276,10 @@ export default function CalculationTab() {
         setMaterials(data);
         if (data.length > 0) setSelectedMaterialId(data[0].id);
       });
+
+    fetch('/api/beam-profiles')
+      .then(res => res.json())
+      .then(data => setAllProfiles(data));
   }, []);
 
   const handleCalculate = async () => {
@@ -279,9 +315,6 @@ export default function CalculationTab() {
       }
     }
 
-    const res = await fetch(`/api/beam-profiles`);
-    const allProfiles: BeamProfile[] = await res.json();
-
     const material = materials.find(m => m.id === selectedMaterialId);
     if (!material) return;
     
@@ -306,44 +339,68 @@ export default function CalculationTab() {
       type: s.type
     }));
 
-    const solverResult = solveBeam(L_mm, solverPointLoads, solverDistLoads, solverSupports);
+    const solverMomentLoads = momentLoads.map(m => ({
+      M: Number(m.magnitude) * (m.direction === 'cw' ? -1 : 1) * 1000000, // Convert kN.m to N.mm
+      a: convertLengthToMm(m.position, m.positionUnit)
+    }));
 
     const allowableStress_MPa = fy_MPa / safetyFactor;
-    const reqWx_cm3 = (solverResult.maxMoment / allowableStress_MPa) / 1000;
-
     const allowDeflection_mm = L_mm / deflectionLimit;
-    const reqIx_cm4 = (solverResult.maxDeflectionWithoutEI / (E_MPa * allowDeflection_mm)) / 10000;
 
     const suitableForSelectedType = allProfiles
       .filter(p => p.type_id === selectedTypeId)
-      .map(p => mapToAdvancedResult(p, undefined, solverPointLoads, solverDistLoads, L_mm, solverSupports, fy_MPa, E_MPa))
+      .map(p => mapToAdvancedResult(p, undefined, solverPointLoads, solverDistLoads, L_mm, solverSupports, fy_MPa, E_MPa, solverMomentLoads))
       .filter(res => res.actualSF >= 1.0 && res.actualDeflection <= allowDeflection_mm && res.shearSF >= 1.0)
       .sort((a, b) => a.profile.p - b.profile.p);
 
     const suggestions = Array.from(new Set(allProfiles.map(p => p.type_id)))
       .filter(typeId => typeId !== selectedTypeId)
-      .map(typeId => {
-        const bestForType = allProfiles
+      .flatMap(typeId => {
+        return allProfiles
           .filter(p => p.type_id === typeId)
-          .map(p => mapToAdvancedResult(p, beamTypes.find(t => t.id === p.type_id)!, solverPointLoads, solverDistLoads, L_mm, solverSupports, fy_MPa, E_MPa))
+          .map(p => mapToAdvancedResult(p, beamTypes.find(t => t.id === p.type_id)!, solverPointLoads, solverDistLoads, L_mm, solverSupports, fy_MPa, E_MPa, solverMomentLoads))
           .filter(res => res.actualSF >= 1.0 && res.actualDeflection <= allowDeflection_mm && res.shearSF >= 1.0)
-          .sort((a, b) => a.profile.p - b.profile.p)[0];
-        return bestForType;
-      })
-      .filter((res): res is AdvancedResult => res !== undefined)
-      .sort((a, b) => a.profile.p - b.profile.p);
+          .sort((a, b) => a.profile.p - b.profile.p);
+      });
+
+    // If self-weight is included, we need a reference profile for the global summary.
+    // We'll use the optimal profile if available, otherwise fallback to the first profile of the selected type.
+    let summaryDistLoads = [...solverDistLoads];
+    const optimalProfile = suitableForSelectedType[0];
+    const refProfile = optimalProfile ? optimalProfile.profile : allProfiles.find(p => p.type_id === selectedTypeId);
+
+    if (includeSelfWeight && refProfile) {
+      const sw_Nmm = (refProfile.p * 9.80665) / 1000;
+      summaryDistLoads.push({
+        w1: sw_Nmm,
+        w2: sw_Nmm,
+        x1: 0,
+        x2: L_mm
+      });
+    }
+
+    const solverResult = solveBeam(L_mm, solverPointLoads, summaryDistLoads, solverSupports, solverMomentLoads);
+
+    const reqWx_cm3 = (solverResult.maxMoment / allowableStress_MPa) / 1000;
+    const reqIx_cm4 = (solverResult.maxDeflectionWithoutEI / (E_MPa * allowDeflection_mm)) / 10000;
+    const refIx = refProfile?.ix || 1;
 
     const calcResults = {
       maxMoment: solverResult.maxMoment / 1000000,
+      maxMomentX: solverResult.maxMomentX / 1000,
       maxShear: solverResult.maxShear / 1000,
-      maxDeflection: solverResult.maxDeflectionWithoutEI / (E_MPa * (suitableForSelectedType[0]?.profile.ix || 1) * 10000),
+      maxShearX: solverResult.maxShearX / 1000,
+      maxDeflection: solverResult.maxDeflectionWithoutEI / (E_MPa * refIx * 10000),
+      maxDeflectionX: solverResult.maxDeflectionX / 1000,
       reqWy: reqWx_cm3,
       reqIy: reqIx_cm4,
       allowableDeflection: allowDeflection_mm,
       reactions: solverResult.reactions,
       reactionComponents: solverResult.reactionComponents,
+      points: solverResult.points,
       suitableProfiles: suitableForSelectedType,
-      suggestions
+      suggestions,
+      selectedProfile: undefined // Reset selection on new calculation
     };
 
     setResults(calcResults);
@@ -355,6 +412,8 @@ export default function CalculationTab() {
         supports,
         pointLoads,
         distributedLoads,
+        momentLoads,
+        includeSelfWeight,
         safetyFactor,
         deflectionLimit,
         material,
@@ -364,16 +423,61 @@ export default function CalculationTab() {
     });
   };
 
+  const handleSelectProfile = (profileResult: AdvancedResult) => {
+    if (!results) return;
+    
+    const updatedResults = {
+      ...results,
+      selectedProfile: profileResult
+    };
+    
+    setResults(updatedResults);
+    
+    setGlobalState(prev => ({
+      ...prev,
+      results: updatedResults
+    }));
+  };
+
+  const handleSelectProfileAndGo = (profileResult: AdvancedResult) => {
+    handleSelectProfile(profileResult);
+    if (onGoToEvidence) {
+      onGoToEvidence();
+    }
+  };
+
   return (
     <div className="flex gap-6 h-full">
-      {/* Inputs Panel */}
-      <div className="w-[420px] min-w-[420px] overflow-y-auto pr-2 space-y-6">
+      {/* Left Column */}
+      <div className="w-[420px] min-w-[420px] flex flex-col gap-4 overflow-hidden">
         
-        {/* Preliminary Parameters Card */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-5">
+        {/* Previsualización de Cargas */}
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-4 shrink-0">
+          <details className="group">
+            <summary className="flex items-center justify-between cursor-pointer list-none">
+              <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">Previsualización de Cargas (Opcional)</span>
+              <span className="text-slate-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="mt-4">
+              <BeamVisualizer
+                spanLength={spanLength}
+                spanUnit={spanUnit}
+                supports={supports}
+                pointLoads={pointLoads}
+                distributedLoads={distributedLoads}
+                momentLoads={momentLoads}
+                noBorder
+                selfWeight={includeSelfWeight ? (allProfiles.find(p => p.type_id === selectedTypeId)?.p || 0) * 9.80665 / 1000 : 0}
+              />
+            </div>
+          </details>
+        </div>
+
+        {/* Selección de Viga */}
+        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-5 shrink-0">
           <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b dark:border-slate-700 pb-2 flex items-center gap-2">
             <Check size={18} className="text-amber-500" />
-            Parámetros Preliminares
+            Selección de Viga
           </h2>
           
           <div className="space-y-4">
@@ -410,6 +514,36 @@ export default function CalculationTab() {
               </div>
             </div>
 
+            {/* Self-Weight Toggle */}
+            <div className="border-t dark:border-slate-700 pt-4 mt-4">
+              <label className="flex items-center gap-3 cursor-pointer group">
+                <div className="relative">
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={includeSelfWeight}
+                    onChange={e => setIncludeSelfWeight(e.target.checked)}
+                  />
+                  <div className={`block w-10 h-6 rounded-full transition-colors ${includeSelfWeight ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}></div>
+                  <div className={`absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${includeSelfWeight ? 'transform translate-x-4' : ''}`}></div>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">Incluir Peso Propio</span>
+                  <span className="text-[10px] text-slate-400">Calcula automáticamente la carga muerta de la viga</span>
+                </div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Parámetros de Cálculo */}
+        <div className="flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-5 overflow-hidden flex flex-col">
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b dark:border-slate-700 pb-2 flex items-center gap-2">
+            <Sparkles size={18} className="text-amber-500" />
+            Parámetros de Cálculo
+          </h2>
+          
+          <div className="flex-1 overflow-y-auto pr-2 space-y-6 pb-20">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Condición de Apoyo</label>
               <select
@@ -424,17 +558,7 @@ export default function CalculationTab() {
                 <option value="custom">Personalizada (Múltiples Apoyos)</option>
               </select>
             </div>
-          </div>
-        </div>
 
-        {/* Beam Configuration Card */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-5">
-          <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b dark:border-slate-700 pb-2 flex items-center gap-2">
-            <Sparkles size={18} className="text-amber-500" />
-            Configuración de la Viga
-          </h2>
-
-          <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Longitud de la Viga (L)</label>
               <div className="flex">
@@ -750,6 +874,93 @@ export default function CalculationTab() {
               </div>
             </div>
 
+            {/* Moment Loads Section */}
+            <div className="space-y-3 border-t dark:border-slate-700 pt-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Momentos Puntuales</h3>
+                <button
+                  onClick={() => setMomentLoads([...momentLoads, { id: crypto.randomUUID(), magnitude: 0, position: 0, positionUnit: spanUnit, direction: 'ccw' }])}
+                  className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center gap-1"
+                >
+                  <Plus size={12} /> Añadir Momento
+                </button>
+              </div>
+              <div className="space-y-3">
+                {momentLoads.map((m, idx) => (
+                  <div key={m.id} className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-lg border border-slate-200 dark:border-slate-700 relative group">
+                    <button
+                      onClick={() => setMomentLoads(momentLoads.filter((_, i) => i !== idx))}
+                      className="absolute -top-2 -right-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1 text-slate-400 hover:text-red-500 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400">Magnitud (kN·m)</label>
+                        <div className="flex">
+                          <select
+                            value={m.direction}
+                            onChange={e => {
+                              const next = [...momentLoads];
+                              next[idx].direction = e.target.value as 'ccw' | 'cw';
+                              setMomentLoads(next);
+                            }}
+                            className="px-1 py-1 text-[10px] bg-slate-100 dark:bg-slate-700 border border-r-0 border-slate-300 dark:border-slate-600 rounded-l dark:text-white"
+                          >
+                            <option value="ccw">↺</option>
+                            <option value="cw">↻</option>
+                          </select>
+                          <input
+                            type="number" step="0.1"
+                            value={m.magnitude === 0 ? '' : m.magnitude}
+                            onChange={e => {
+                              const next = [...momentLoads];
+                              next[idx].magnitude = e.target.value === '' ? 0 : Number(e.target.value);
+                              setMomentLoads(next);
+                            }}
+                            className="w-full px-2 py-1 text-xs border border-slate-300 dark:border-slate-600 rounded-r focus:outline-none dark:bg-slate-700 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] uppercase font-bold text-slate-400">Posición</label>
+                        <div className="flex">
+                          <input
+                            type="number" step="0.1"
+                            value={m.position === 0 ? '' : m.position}
+                            onChange={e => {
+                              const next = [...momentLoads];
+                              next[idx].position = e.target.value === '' ? 0 : Number(e.target.value);
+                              setMomentLoads(next);
+                            }}
+                            className="w-full px-2 py-1 text-xs border border-slate-300 dark:border-slate-600 rounded-l focus:outline-none dark:bg-slate-700 dark:text-white"
+                          />
+                          <select
+                            value={m.positionUnit}
+                            onChange={e => {
+                              const next = [...momentLoads];
+                              next[idx].positionUnit = e.target.value;
+                              setMomentLoads(next);
+                            }}
+                            className="px-1 py-1 text-[10px] bg-slate-100 dark:bg-slate-700 border border-l-0 border-slate-300 dark:border-slate-600 rounded-r dark:text-white"
+                          >
+                            <option value="m">m</option>
+                            <option value="mm">mm</option>
+                            <option value="in">in</option>
+                            <option value="ft">ft</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {momentLoads.length === 0 && <div className="text-center text-[10px] text-slate-400 py-2">No hay momentos puntuales</div>}
+              </div>
+            </div>
+
+            {/* Self-Weight Toggle */}
+            {/* Moved to Selección de Viga */}
+
             <div className="grid grid-cols-2 gap-4 border-t dark:border-slate-700 pt-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Factor de Seguridad</label>
@@ -783,33 +994,43 @@ export default function CalculationTab() {
               </div>
             </div>
 
-            <button
-              onClick={handleCalculate}
-              className="w-full mt-4 bg-amber-500 text-white font-semibold py-2.5 rounded-md hover:bg-amber-600 transition-colors shadow-sm"
-            >
-              Calcular y Seleccionar Óptimo
-            </button>
-
-            {error && (
-              <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400 text-xs rounded-md flex items-center gap-2">
-                <X size={14} className="flex-shrink-0" />
-                {error}
-              </div>
-            )}
+            {/* Floating Calculate Button */}
+            <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+              <button
+                onClick={handleCalculate}
+                className="bg-amber-500 text-white font-bold py-3 px-8 rounded-full hover:bg-amber-600 transition-all shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2"
+              >
+                <Calculator size={20} />
+                Calcular
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
+      {error && (
+        <div className="fixed bottom-24 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-2xl px-4 pointer-events-none">
+          <div className="p-4 bg-red-50 dark:bg-red-900/90 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-100 rounded-lg shadow-2xl flex items-center gap-3 font-medium pointer-events-auto">
+            <X size={20} className="flex-shrink-0" />
+            {error}
+          </div>
+        </div>
+      )}
+
       {/* Results Panel */}
-      <div className="flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-5 overflow-hidden flex flex-col">
+      <div className="flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-5 overflow-hidden flex flex-col h-full">
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b dark:border-slate-700 pb-2">Resultados</h2>
         
         {results ? (
-          <div className="flex flex-col h-full overflow-y-auto pr-2">
-            <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="flex flex-col h-full overflow-y-auto pr-2 pb-20">
+            <div className="grid grid-cols-5 gap-4 mb-6">
               <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
                 <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Momento Máx</div>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{results.maxMoment.toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">kN·m</span></div>
+                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{(results.selectedProfile?.maxMoment || results.maxMoment).toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">kN·m</span></div>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
+                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Cortante Máx</div>
+                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{(results.selectedProfile?.maxShear || results.maxShear || 0).toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">kN</span></div>
               </div>
               <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
                 <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Wx Requerido</div>
@@ -829,20 +1050,11 @@ export default function CalculationTab() {
               <h3 className="text-md font-semibold text-slate-700 dark:text-slate-200">
                 Perfiles Adecuados ({beamTypes.find(t => t.id === selectedTypeId)?.name})
               </h3>
-              <div className="flex gap-2 text-sm text-slate-700 dark:text-slate-200">
-                <FilterDropdown
-                  label="Filtrar Perfiles"
-                  options={results.suitableProfiles.map(p => ({ id: p.profile.id, name: p.profile.name }))}
-                  selectedIds={selectedProfileTypes}
-                  onSelectionChange={setSelectedProfileTypes}
-                />
-              </div>
             </div>
             <div className="mb-6">
               {results.suitableProfiles.length > 0 ? (
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-2 p-1">
                   {results.suitableProfiles
-                    .filter(res => selectedProfileTypes.size === 0 || selectedProfileTypes.has(res.profile.id))
                     .map((res, index) => (
                     <div key={res.profile.id}>
                       <ProfileCard 
@@ -850,6 +1062,8 @@ export default function CalculationTab() {
                         isOptimal={index === 0} 
                         beamTypes={beamTypes} 
                         selectedTypeId={selectedTypeId} 
+                        isSelected={results.selectedProfile?.profile.id === res.profile.id}
+                        onSelect={() => handleSelectProfileAndGo(res)}
                       />
                     </div>
                   ))}
@@ -868,25 +1082,42 @@ export default function CalculationTab() {
                   <div className="flex gap-2 text-sm text-slate-700 dark:text-slate-200">
                     <FilterDropdown
                       label="Filtrar Sugerencias por Tipo"
-                      options={beamTypes.filter(t => results.suggestions.some(s => s.type?.id === t.id)).map(t => ({ id: t.id, name: t.name }))}
+                      options={beamTypes.filter(t => t.id !== selectedTypeId).map(t => ({ id: t.id, name: t.name }))}
                       selectedIds={selectedSuggestionTypes}
                       onSelectionChange={setSelectedSuggestionTypes}
                     />
                   </div>
                 </div>
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                  {results.suggestions
-                    .filter(sug => selectedSuggestionTypes.size === 0 || (sug.type && selectedSuggestionTypes.has(sug.type.id)))
-                    .map((sug) => (
-                    <div key={sug.profile.id}>
-                      <ProfileCard 
-                        result={sug} 
-                        isOptimal={false} 
-                        beamTypes={beamTypes} 
-                        selectedTypeId={selectedTypeId} 
-                      />
-                    </div>
-                  ))}
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-2 p-1">
+                  {(() => {
+                    let displayedSuggestions = [];
+                    if (selectedSuggestionTypes.size === 0) {
+                      // Show only the optimal (first) profile for each type
+                      const seenTypes = new Set();
+                      for (const sug of results.suggestions) {
+                        if (sug.type && !seenTypes.has(sug.type.id)) {
+                          seenTypes.add(sug.type.id);
+                          displayedSuggestions.push(sug);
+                        }
+                      }
+                    } else {
+                      // Show all profiles for the selected types
+                      displayedSuggestions = results.suggestions.filter(sug => sug.type && selectedSuggestionTypes.has(sug.type.id));
+                    }
+
+                    return displayedSuggestions.map((sug) => (
+                      <div key={sug.profile.id}>
+                        <ProfileCard 
+                          result={sug} 
+                          isOptimal={selectedSuggestionTypes.size === 0 ? true : results.suggestions.find(s => s.type?.id === sug.type?.id)?.profile.id === sug.profile.id} 
+                          beamTypes={beamTypes} 
+                          selectedTypeId={selectedTypeId} 
+                          isSelected={results.selectedProfile?.profile.id === sug.profile.id}
+                          onSelect={() => handleSelectProfileAndGo(sug)}
+                        />
+                      </div>
+                    ));
+                  })()}
                 </div>
               </>
             )}

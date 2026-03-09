@@ -38,8 +38,17 @@ export interface AdvancedResult {
   type?: BeamType;
   actualSF: number;
   actualDeflection: number;
+  maxMoment: number;
   maxShear: number;
   shearStress: number;
   shearSF: number;
+  vonMisesStress: number;
+  vonMisesSF: number;
+  maxMomentX: number;
+  maxShearX: number;
+  maxDeflectionX: number;
+  reactions: number[];
+  reactionComponents: any[];
+  points: { x: number, V: number, M: number, EI_v: number }[];
 }
 

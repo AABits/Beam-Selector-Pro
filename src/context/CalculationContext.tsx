@@ -8,6 +8,8 @@ interface CalculationState {
     supports: any[];
     pointLoads: any[];
     distributedLoads: any[];
+    momentLoads: any[];
+    includeSelfWeight: boolean;
     safetyFactor: number;
     deflectionLimit: number;
     material?: Material;
@@ -15,15 +17,20 @@ interface CalculationState {
   } | null;
   results: {
     maxMoment: number; // kN.m
+    maxMomentX: number;
     maxShear: number; // kN
+    maxShearX: number;
     maxDeflection: number; // mm
+    maxDeflectionX: number;
     reqWy: number; // cm3
     reqIy: number; // cm4
     allowableDeflection: number; // mm
     reactions: number[];
     reactionComponents: any[];
+    points: { x: number, V: number, M: number, EI_v: number }[];
     suitableProfiles: AdvancedResult[];
     suggestions: AdvancedResult[];
+    selectedProfile?: AdvancedResult;
   } | null;
 }
 

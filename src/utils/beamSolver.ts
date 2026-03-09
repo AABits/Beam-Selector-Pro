@@ -2,60 +2,32 @@ export function solveBeam(
   L: number, // mm
   pointLoads: { P: number, a: number }[], // N, mm
   distributedLoads: { w1: number, w2: number, x1: number, x2: number }[], // N/mm, mm
-  supports: { x: number, type: 'pinned' | 'roller' | 'fixed' }[]
+  supports: { x: number, type: 'pinned' | 'roller' | 'fixed' }[],
+  momentLoads: { M: number, a: number }[] = [] // N*mm, mm
 ) {
   if (L <= 0 || supports.length === 0) {
-    return { maxMoment: 0, maxShear: 0, maxDeflectionWithoutEI: 0 };
+    return { 
+      maxMoment: 0, maxMomentX: 0,
+      maxShear: 0, maxShearX: 0,
+      maxDeflectionWithoutEI: 0, maxDeflectionX: 0,
+      reactions: [], reactionComponents: [], points: [] 
+    };
   }
 
-  const N = 500;
-  const dx = L / N;
-  
-  // 1. Precalculate I1 and I2 for loads (Macaulay-like integration)
-  const I1_loads = new Float64Array(N + 1);
-  const I2_loads = new Float64Array(N + 1);
-  const M_loads = new Float64Array(N + 1);
-  const V_loads = new Float64Array(N + 1);
+  // Normalize coordinates by L to improve matrix conditioning
+  const nPointLoads = pointLoads.map(p => ({ P: p.P, a: p.a / L }));
+  const nDistLoads = distributedLoads.map(d => ({ 
+    w1: d.w1 * L, 
+    w2: d.w2 * L, 
+    x1: d.x1 / L, 
+    x2: d.x2 / L 
+  }));
+  const nMomentLoads = momentLoads.map(m => ({ M: m.M / L, a: m.a / L }));
+  const nSupports = supports.map(s => ({ x: s.x / L, type: s.type }));
 
-  for (let i = 0; i <= N; i++) {
-    const x = i * dx;
-    let v = 0;
-    let m = 0;
-    
-    for (const dl of distributedLoads) {
-      if (x > dl.x1) {
-        const x_end = Math.min(x, dl.x2);
-        const A = dl.w1;
-        const B = (dl.x2 === dl.x1) ? 0 : (dl.w2 - dl.w1) / (dl.x2 - dl.x1);
-        const u_end = x_end - dl.x1;
-        const D = x - dl.x1;
-        
-        v += A * u_end + 0.5 * B * u_end * u_end;
-        m += A * D * u_end - 0.5 * A * u_end * u_end + 0.5 * B * D * u_end * u_end - (B / 3) * u_end * u_end * u_end;
-      }
-    }
-
-    for (const pl of pointLoads) {
-      if (x > pl.a) {
-        v += pl.P;
-        m += pl.P * (x - pl.a);
-      }
-    }
-    
-    V_loads[i] = v;
-    M_loads[i] = m;
-  }
-  
-  for (let i = 1; i <= N; i++) {
-    I1_loads[i] = I1_loads[i-1] + 0.5 * (M_loads[i-1] + M_loads[i]) * dx;
-    I2_loads[i] = I2_loads[i-1] + 0.5 * (I1_loads[i-1] + I1_loads[i]) * dx;
-  }
-
-  // 2. Set up linear system for reactions and integration constants C1, C2
-  // Unknowns: [R1, R2, ..., Rn, M1, M2, ..., Mm, C1, C2]
-  // Reaction components: Force R_i at x_i, Moment M_j at x_j
+  // 1. Identify reaction components
   const reactionComponents: { x: number, type: 'force' | 'moment' }[] = [];
-  for (const s of supports) {
+  for (const s of nSupports) {
     if (s.type === 'pinned' || s.type === 'roller') {
       reactionComponents.push({ x: s.x, type: 'force' });
     } else if (s.type === 'fixed') {
@@ -65,125 +37,235 @@ export function solveBeam(
   }
 
   const numReactions = reactionComponents.length;
-  const numUnknowns = numReactions + 2;
+  const numUnknowns = numReactions + 2; // Reactions + C1', C2'
+
   const A = Array.from({ length: numUnknowns }, () => new Float64Array(numUnknowns));
   const B = new Float64Array(numUnknowns);
 
-  // Equilibrium Equations
-  // 1. Sum of Forces = 0
+  // Global Equilibrium (Normalized)
   for (let j = 0; j < numReactions; j++) {
     if (reactionComponents[j].type === 'force') A[0][j] = 1;
-    else A[0][j] = 0;
   }
-  B[0] = -V_loads[N];
+  let sumP = 0;
+  for (const pl of nPointLoads) sumP += pl.P;
+  for (const dl of nDistLoads) {
+    sumP += 0.5 * (dl.w1 + dl.w2) * (dl.x2 - dl.x1);
+  }
+  B[0] = -sumP;
 
-  // 2. Sum of Moments about x=0 = 0
-  // Sum(R_k * x_k) + Sum(M_k) + Sum(P_i * a_i) = 0
-  // Sum(P_i * a_i) = V_loads[N] * L - M_loads[N]
   for (let j = 0; j < numReactions; j++) {
     if (reactionComponents[j].type === 'force') A[1][j] = reactionComponents[j].x;
     else A[1][j] = 1;
   }
-  B[1] = -(V_loads[N] * L - M_loads[N]);
+  let sumM0 = 0;
+  for (const pl of nPointLoads) sumM0 += pl.P * pl.a;
+  for (const ml of nMomentLoads) sumM0 += ml.M;
+  for (const dl of nDistLoads) {
+    const length = dl.x2 - dl.x1;
+    if (length > 0) {
+      const centroid = (length / 3) * (dl.w1 + 2 * dl.w2) / (dl.w1 + dl.w2);
+      sumM0 += 0.5 * (dl.w1 + dl.w2) * length * (dl.x1 + centroid);
+    }
+  }
+  B[1] = -sumM0;
 
-  // Boundary Conditions
+  // Boundary Conditions (Normalized)
   let eqIdx = 2;
-  for (const s of supports) {
-    // v(x_s) = 0
-    // C2 + C1*x_s + I2_loads(x_s) + sum(R_i * <x_s - x_i>^3 / 6) + sum(M_j * <x_s - x_j>^2 / 2) = 0
-    const x_s = s.x;
+  for (const s of nSupports) {
+    const xi_s = s.x;
     for (let j = 0; j < numReactions; j++) {
-      const x_j = reactionComponents[j].x;
-      const type_j = reactionComponents[j].type;
-      if (x_s > x_j) {
-        if (type_j === 'force') A[eqIdx][j] = Math.pow(x_s - x_j, 3) / 6;
-        else A[eqIdx][j] = Math.pow(x_s - x_j, 2) / 2;
+      const xi_j = reactionComponents[j].x;
+      if (xi_s > xi_j) {
+        if (reactionComponents[j].type === 'force') A[eqIdx][j] = Math.pow(xi_s - xi_j, 3) / 6;
+        else A[eqIdx][j] = Math.pow(xi_s - xi_j, 2) / 2;
       }
     }
-    A[eqIdx][numReactions] = x_s; // C1
-    A[eqIdx][numReactions + 1] = 1; // C2
+    A[eqIdx][numReactions] = xi_s; // C1'
+    A[eqIdx][numReactions + 1] = 1; // C2'
     
-    // Find I2_loads at x_s using interpolation
-    const idx = Math.min(Math.floor(x_s / dx), N - 1);
-    const frac = (x_s - idx * dx) / dx;
-    B[eqIdx] = -(I2_loads[idx] + frac * (I2_loads[idx + 1] - I2_loads[idx]));
+    let v_loads = 0;
+    for (const pl of nPointLoads) {
+      if (xi_s > pl.a) v_loads += pl.P * Math.pow(xi_s - pl.a, 3) / 6;
+    }
+    for (const ml of nMomentLoads) {
+      if (xi_s > ml.a) v_loads += ml.M * Math.pow(xi_s - ml.a, 2) / 2;
+    }
+    for (const dl of nDistLoads) {
+      if (xi_s > dl.x1) {
+        const xi_eff = Math.min(xi_s, dl.x2);
+        const L_d = dl.x2 - dl.x1;
+        const w1 = dl.w1;
+        const w2 = dl.w2;
+        const k = (w2 - w1) / L_d;
+        const u = xi_eff - dl.x1;
+        v_loads += (w1 / 24) * Math.pow(u, 4) + (k / 120) * Math.pow(u, 5);
+        
+        if (xi_s > dl.x2) {
+          const V_full = w1 * L_d + 0.5 * k * L_d * L_d;
+          const M_full = 0.5 * w1 * L_d * L_d + (k / 6) * L_d * L_d * L_d;
+          const theta_full = (w1 / 6) * Math.pow(L_d, 3) + (k / 24) * Math.pow(L_d, 4);
+          const d = xi_s - dl.x2;
+          v_loads += theta_full * d + M_full * d * d / 2 + V_full * d * d * d / 6;
+        }
+      }
+    }
+    B[eqIdx] = -v_loads;
     eqIdx++;
 
     if (s.type === 'fixed') {
-      // theta(x_s) = 0
-      // C1 + I1_loads(x_s) + sum(R_i * <x_s - x_i>^2 / 2) + sum(M_j * <x_s - x_j>^1) = 0
       for (let j = 0; j < numReactions; j++) {
-        const x_j = reactionComponents[j].x;
-        const type_j = reactionComponents[j].type;
-        if (x_s > x_j) {
-          if (type_j === 'force') A[eqIdx][j] = Math.pow(x_s - x_j, 2) / 2;
-          else A[eqIdx][j] = (x_s - x_j);
+        const xi_j = reactionComponents[j].x;
+        if (xi_s > xi_j) {
+          if (reactionComponents[j].type === 'force') A[eqIdx][j] = Math.pow(xi_s - xi_j, 2) / 2;
+          else A[eqIdx][j] = (xi_s - xi_j);
         }
       }
-      A[eqIdx][numReactions] = 1; // C1
-      A[eqIdx][numReactions + 1] = 0; // C2
+      A[eqIdx][numReactions] = 1; // C1'
       
-      const idx = Math.min(Math.floor(x_s / dx), N - 1);
-      const frac = (x_s - idx * dx) / dx;
-      B[eqIdx] = -(I1_loads[idx] + frac * (I1_loads[idx + 1] - I1_loads[idx]));
+      let t_loads = 0;
+      for (const pl of nPointLoads) {
+        if (xi_s > pl.a) t_loads += pl.P * Math.pow(xi_s - pl.a, 2) / 2;
+      }
+      for (const ml of nMomentLoads) {
+        if (xi_s > ml.a) t_loads += ml.M * (xi_s - ml.a);
+      }
+      for (const dl of nDistLoads) {
+        if (xi_s > dl.x1) {
+          const xi_eff = Math.min(xi_s, dl.x2);
+          const L_d = dl.x2 - dl.x1;
+          const w1 = dl.w1;
+          const w2 = dl.w2;
+          const k = (w2 - w1) / L_d;
+          const u = xi_eff - dl.x1;
+          t_loads += (w1 / 6) * Math.pow(u, 3) + (k / 24) * Math.pow(u, 4);
+          
+          if (xi_s > dl.x2) {
+            const V_full = w1 * L_d + 0.5 * k * L_d * L_d;
+            const M_full = 0.5 * w1 * L_d * L_d + (k / 6) * L_d * L_d * L_d;
+            const d = xi_s - dl.x2;
+            t_loads += M_full * d + 0.5 * V_full * d * d;
+          }
+        }
+      }
+      B[eqIdx] = -t_loads;
       eqIdx++;
     }
   }
 
-  // Solve A*X = B using Gaussian elimination
   const X = solveLinearSystem(A, B);
-  if (!X) return { maxMoment: 0, maxShear: 0, maxDeflectionWithoutEI: 0, reactions: [], reactionComponents: [] };
+  if (!X) return { 
+    maxMoment: 0, maxMomentX: 0,
+    maxShear: 0, maxShearX: 0,
+    maxDeflectionWithoutEI: 0, maxDeflectionX: 0,
+    reactions: [], reactionComponents: [], points: [] 
+  };
 
   const reactions = X.slice(0, numReactions);
-  const C1 = X[numReactions];
-  const C2 = X[numReactions + 1];
+  const C1_prime = X[numReactions];
+  const C2_prime = X[numReactions + 1];
 
-  // 3. Calculate final results
-  let max_M = 0;
-  let max_V = 0;
-  let max_EI_v = 0;
+  // 3. Generate points (Denormalize results)
+  const N = 500;
+  const points: { x: number, V: number, M: number, EI_v: number }[] = [];
+  let max_M = 0; let max_MX = 0;
+  let max_V = 0; let max_VX = 0;
+  let max_EI_v = 0; let max_EI_vX = 0;
 
   for (let i = 0; i <= N; i++) {
-    const x = i * dx;
-    // V(x) = V_loads(x) + sum(R_k)
-    // M(x) = M_loads(x) + sum(R_k * <x - x_k>) + sum(M_k)
-    // EI_v(x) = I2_loads(x) + sum(R_k * <x - x_k>^3 / 6) + sum(M_k * <x - x_k>^2 / 2) + C1*x + C2
-    let V = V_loads[i];
-    let M = M_loads[i];
-    let EI_v = I2_loads[i] + C1 * x + C2;
+    const xi = i / N;
+    const x = xi * L;
+    let V = 0;
+    let M_prime = 0;
+    let v_prime = C1_prime * xi + C2_prime;
 
     for (let j = 0; j < numReactions; j++) {
-      const x_j = reactionComponents[j].x;
-      const type_j = reactionComponents[j].type;
+      const xi_j = reactionComponents[j].x;
       const val = reactions[j];
-      if (x > x_j) {
-        if (type_j === 'force') {
+      if (xi > xi_j) {
+        if (reactionComponents[j].type === 'force') {
           V += val;
-          M += val * (x - x_j);
-          EI_v += val * Math.pow(x - x_j, 3) / 6;
+          M_prime += val * (xi - xi_j);
+          v_prime += val * Math.pow(xi - xi_j, 3) / 6;
         } else {
-          M += val;
-          EI_v += val * Math.pow(x - x_j, 2) / 2;
+          M_prime += val;
+          v_prime += val * Math.pow(xi - xi_j, 2) / 2;
         }
       }
     }
 
-    if (Math.abs(M) > max_M) max_M = Math.abs(M);
-    if (Math.abs(V) > max_V) max_V = Math.abs(V);
-    if (Math.abs(EI_v) > max_EI_v) max_EI_v = Math.abs(EI_v);
+    for (const pl of nPointLoads) {
+      if (xi > pl.a) {
+        V += pl.P;
+        M_prime += pl.P * (xi - pl.a);
+        v_prime += pl.P * Math.pow(xi - pl.a, 3) / 6;
+      }
+    }
+    for (const ml of nMomentLoads) {
+      if (xi > ml.a) {
+        M_prime += ml.M;
+        v_prime += ml.M * Math.pow(xi - ml.a, 2) / 2;
+      }
+    }
+    for (const dl of nDistLoads) {
+      if (xi > dl.x1) {
+        const xi_eff = Math.min(xi, dl.x2);
+        const L_d = dl.x2 - dl.x1;
+        const w1 = dl.w1;
+        const w2 = dl.w2;
+        const k = (w2 - w1) / L_d;
+        const u = xi_eff - dl.x1;
+        
+        const V_seg = w1 * u + 0.5 * k * u * u;
+        const M_seg = 0.5 * w1 * u * u + (k / 6) * u * u * u;
+        const v_seg = (w1 / 24) * Math.pow(u, 4) + (k / 120) * Math.pow(u, 5);
+        const theta_seg = (w1 / 6) * Math.pow(u, 3) + (k / 24) * Math.pow(u, 4);
+
+        V += V_seg;
+        M_prime += M_seg;
+        v_prime += v_seg;
+
+        if (xi > dl.x2) {
+          const d = xi - dl.x2;
+          M_prime += V_seg * d;
+          v_prime += theta_seg * d + 0.5 * M_seg * d * d + (1/6) * V_seg * d * d * d;
+        }
+      }
+    }
+
+    const M = M_prime * L;
+    const EI_v = v_prime * Math.pow(L, 3);
+
+    points.push({ x, V, M, EI_v });
+    if (Math.abs(M) > max_M) { max_M = Math.abs(M); max_MX = x; }
+    if (Math.abs(V) > max_V) { max_V = Math.abs(V); max_VX = x; }
+    if (Math.abs(EI_v) > max_EI_v) { max_EI_v = Math.abs(EI_v); max_EI_vX = x; }
   }
 
   return {
-    maxMoment: max_M,
-    maxShear: max_V,
-    maxDeflectionWithoutEI: max_EI_v,
+    maxMoment: max_M, maxMomentX: max_MX,
+    maxShear: max_V, maxShearX: max_VX,
+    maxDeflectionWithoutEI: max_EI_v, maxDeflectionX: max_EI_vX,
     reactions: Array.from(reactions),
-    reactionComponents
+    reactionComponents: reactionComponents.map(rc => ({ x: rc.x * L, type: rc.type })),
+    points
   };
 }
 
 function solveLinearSystem(A: Float64Array[], B: Float64Array): Float64Array | null {
   const n = B.length;
+  
+  // Row scaling to improve conditioning
+  for (let i = 0; i < n; i++) {
+    let maxVal = 0;
+    for (let j = 0; j < n; j++) {
+      if (Math.abs(A[i][j]) > maxVal) maxVal = Math.abs(A[i][j]);
+    }
+    if (maxVal > 0) {
+      for (let j = 0; j < n; j++) A[i][j] /= maxVal;
+      B[i] /= maxVal;
+    }
+  }
+
   for (let i = 0; i < n; i++) {
     // Pivot selection
     let max = Math.abs(A[i][i]);

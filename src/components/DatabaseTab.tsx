@@ -258,8 +258,8 @@ export default function DatabaseTab() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {activeTab === 'materials' ? (
           <>
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
-              <h2 className="text-lg font-semibold text-slate-800">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800">
+              <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
                 Materiales
               </h2>
               <form onSubmit={async (e) => {
@@ -280,7 +280,7 @@ export default function DatabaseTab() {
                   value={newMaterialName}
                   onChange={e => setNewMaterialName(e.target.value)}
                   placeholder="Nombre del material..."
-                  className="w-64 px-3 py-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-64 px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-slate-700 dark:text-white"
                 />
                 <button
                   type="submit"
@@ -293,7 +293,7 @@ export default function DatabaseTab() {
             <div className="flex-1 overflow-auto p-4">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-slate-200 text-sm text-slate-600">
+                  <tr className="border-b-2 border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400">
                     <th className="py-2 px-3 font-semibold">Nombre</th>
                     <th className="py-2 px-3 font-semibold">fy (MPa)</th>
                     <th className="py-2 px-3 font-semibold">E (GPa)</th>
@@ -304,17 +304,17 @@ export default function DatabaseTab() {
                   {materials.map(material => {
                     const isEditing = editingMaterialId === material.id;
                     return (
-                      <tr key={material.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <tr key={material.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
                         <td className="py-2 px-3">
                           {isEditing ? (
                             <input
                               type="text"
                               value={editMaterialForm.name || ''}
                               onChange={e => setEditMaterialForm({ ...editMaterialForm, name: e.target.value })}
-                              className="w-full px-2 py-1 border rounded"
+                              className="w-full px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
                             />
                           ) : (
-                            <span className="font-medium text-slate-800">{material.name}</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">{material.name}</span>
                           )}
                         </td>
                         <td className="py-2 px-3">
@@ -323,10 +323,10 @@ export default function DatabaseTab() {
                               type="number"
                               value={editMaterialForm.fy || ''}
                               onChange={e => setEditMaterialForm({ ...editMaterialForm, fy: parseFloat(e.target.value) || 0 })}
-                              className="w-24 px-2 py-1 border rounded"
+                              className="w-24 px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
                             />
                           ) : (
-                            <span className="text-slate-600">{material.fy}</span>
+                            <span className="text-slate-600 dark:text-slate-400">{material.fy}</span>
                           )}
                         </td>
                         <td className="py-2 px-3">
@@ -335,10 +335,10 @@ export default function DatabaseTab() {
                               type="number"
                               value={editMaterialForm.e || ''}
                               onChange={e => setEditMaterialForm({ ...editMaterialForm, e: parseFloat(e.target.value) || 0 })}
-                              className="w-24 px-2 py-1 border rounded"
+                              className="w-24 px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
                             />
                           ) : (
-                            <span className="text-slate-600">{material.e}</span>
+                            <span className="text-slate-600 dark:text-slate-400">{material.e}</span>
                           )}
                         </td>
                         <td className="py-2 px-3 text-right">
@@ -378,8 +378,8 @@ export default function DatabaseTab() {
           </>
         ) : selectedTypeId ? (
           <>
-            <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white">
-              <h2 className="text-lg font-semibold text-slate-800">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800">
+              <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
                 Perfiles para {beamTypes.find(t => t.id === selectedTypeId)?.name}
               </h2>
               <button
@@ -392,7 +392,7 @@ export default function DatabaseTab() {
             <div className="flex-1 overflow-auto p-4">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b-2 border-slate-200 text-sm text-slate-600">
+                  <tr className="border-b-2 border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400">
                     <th className="py-2 px-3 font-semibold">Nombre</th>
                     <th className="py-2 px-3 font-semibold">{isRound ? 'D (mm)' : 'h (mm)'}</th>
                     <th className="py-2 px-3 font-semibold">{isRound ? '-' : 'b (mm)'}</th>
@@ -411,17 +411,17 @@ export default function DatabaseTab() {
                   {profiles.map(profile => {
                     const isEditing = editingProfileId === profile.id;
                     return (
-                      <tr key={profile.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <tr key={profile.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
                         <td className="py-2 px-3">
                           {isEditing ? (
                             <input
                               type="text"
                               value={editForm.name || ''}
                               onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                              className="w-full px-2 py-1 border rounded"
+                              className="w-full px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
                             />
                           ) : (
-                            <span className="font-medium text-slate-800">{profile.name}</span>
+                            <span className="font-medium text-slate-800 dark:text-slate-200">{profile.name}</span>
                           )}
                         </td>
                         {['h', 'b', 'e', 'e1', 'a', 'ix', 'wx', 'iy', 'wy', 'p'].map((field) => {
@@ -434,13 +434,13 @@ export default function DatabaseTab() {
                                     type="number"
                                     value={editForm[field as keyof BeamProfile] || ''}
                                     onChange={e => setEditForm({ ...editForm, [field]: parseFloat(e.target.value) || 0 })}
-                                    className="w-16 px-2 py-1 border rounded"
+                                    className="w-16 px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
                                   />
                                 ) : (
-                                  <span className="text-slate-300">-</span>
+                                  <span className="text-slate-300 dark:text-slate-600">-</span>
                                 )
                               ) : (
-                                <span className="text-slate-600">{isDisabled ? '-' : profile[field as keyof BeamProfile]}</span>
+                                <span className="text-slate-600 dark:text-slate-400">{isDisabled ? '-' : profile[field as keyof BeamProfile]}</span>
                               )}
                             </td>
                           );
