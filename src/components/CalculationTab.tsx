@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { solveBeam } from '../utils/beamSolver';
-import { Plus, Trash2, Sparkles, Loader2, Check, X, Info, ArrowDown, ArrowUp, Calculator, BarChart2, AlertTriangle } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Loader2, Check, X, Info, ArrowDown, ArrowUp, Calculator, BarChart2, AlertTriangle, RotateCw } from 'lucide-react';
 import type { BeamType, BeamProfile, Material, AdvancedResult } from '../types';
 import FilterDropdown from './FilterDropdown';
 import ProfileCard from './ProfileCard';
@@ -148,6 +148,25 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
 
   const [safetyFactor, setSafetyFactor] = useState<number>(1);
   const [deflectionLimit, setDeflectionLimit] = useState<number>(250);
+
+  const handleReset = () => {
+    setSelectedTypeId('');
+    setSelectedMaterialId('');
+    setSupportCondition('simply_supported');
+    setSpanLength(5);
+    setSpanUnit('m');
+    setPointLoads([]);
+    setDistributedLoads([]);
+    setMomentLoads([]);
+    setIncludeSelfWeight(true);
+    setSafetyFactor(1);
+    setDeflectionLimit(250);
+    setResults(null);
+    setGlobalState({ inputs: null, results: null });
+    setError(null);
+    setSelectedProfileTypes(new Set());
+    setSelectedSuggestionTypes(new Set());
+  };
 
   const [selectedProfileTypes, setSelectedProfileTypes] = useState<Set<number>>(new Set());
   const [selectedSuggestionTypes, setSelectedSuggestionTypes] = useState<Set<number>>(new Set());
@@ -996,7 +1015,14 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
             </div>
 
             {/* Floating Calculate Button */}
-            <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+            <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 group">
+              <button
+                onClick={handleReset}
+                className="bg-red-500 text-white w-12 h-12 rounded-full shadow-lg opacity-0 pointer-events-none translate-y-2 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 transition-all duration-200 hover:bg-red-600 flex items-center justify-center"
+                title="Reiniciar cálculos"
+              >
+                <RotateCw size={24} />
+              </button>
               <button
                 onClick={handleCalculate}
                 className="bg-amber-500 text-white font-bold py-3 px-8 rounded-full hover:bg-amber-600 transition-all shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2"

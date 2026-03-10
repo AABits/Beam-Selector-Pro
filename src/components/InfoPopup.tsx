@@ -62,38 +62,39 @@ export default function InfoPopup({ className }: { className?: string }) {
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-slate-800">¿Cómo usar Beam Selector Pro?</h3>
               <ol className="list-decimal pl-5 space-y-2">
-                <li><strong>Base de Datos:</strong> Primero, asegúrate de tener los perfiles y materiales que necesitas en la pestaña "Base de Datos". Puedes agregar nuevos tipos de vigas (ej. HEB, IPE, UPN) y sus respectivos perfiles con sus propiedades geométricas.</li>
-                <li><strong>Selección de Material:</strong> En la pestaña "Cálculo", elige el material de la viga. Esto definirá el límite de fluencia (fy) y el módulo de elasticidad (E).</li>
-                <li><strong>Condiciones de Apoyo y Carga:</strong> Selecciona cómo está apoyada la viga y qué tipo de carga soporta. Ingresa la longitud de la viga y la magnitud de la carga.</li>
-                <li><strong>Unidades:</strong> Puedes mezclar unidades. Por ejemplo, la longitud en metros (m) y la carga en kilogramos masa (kg). El sistema realizará las conversiones automáticamente.</li>
-                <li><strong>Calcular:</strong> Haz clic en "Calcular". El software filtrará los perfiles que cumplen con los requisitos de resistencia (Momento Flector) y rigidez (Deflexión), ordenándolos del más ligero al más pesado.</li>
+                <li><strong>Configuración Inicial:</strong> Defina el material y el tipo de viga deseado. El sistema cargará automáticamente las propiedades desde la base de datos.</li>
+                <li><strong>Definición de Cargas:</strong> Ingrese cargas puntuales, distribuidas (uniformes o trapezoidales) y momentos. Use el botón "+" para añadir múltiples cargas.</li>
+                <li><strong>Peso Propio:</strong> Active el interruptor "Incluir Peso Propio" para que el sistema sume automáticamente la carga muerta según la sección transversal.</li>
+                <li><strong>Cálculo y Optimización:</strong> Haga clic en "Calcular". El motor de resolución (Macaulay) resolverá la viga, incluso si es estáticamente indeterminada.</li>
+                <li><strong>Navegación y Reinicio:</strong> Use el logo para volver al inicio sin perder datos, o el botón rojo (hover sobre Calcular) para limpiar todo.</li>
               </ol>
             </div>
           )}
 
           {activeTab === 'parametros' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-800">Glosario de Parámetros</h3>
+              <h3 className="text-lg font-semibold text-slate-800">Glosario Técnico Actualizado</h3>
               <ul className="space-y-3">
-                <li><strong>fy (Límite de Fluencia):</strong> Esfuerzo a partir del cual el material comienza a deformarse plásticamente (permanentemente). Unidades comunes: MPa, psi.</li>
-                <li><strong>E (Módulo de Elasticidad):</strong> Medida de la rigidez del material. Para el acero suele ser ~200 GPa.</li>
-                <li><strong>Wx (Módulo Resistente):</strong> Propiedad geométrica de la sección transversal usada para calcular esfuerzos por flexión. Unidades: cm³.</li>
-                <li><strong>Ix (Momento de Inercia):</strong> Propiedad geométrica que indica la resistencia de la sección a curvarse (deflexión). Unidades: cm⁴.</li>
-                <li><strong>Factor de Seguridad (FS):</strong> Coeficiente que reduce el esfuerzo permisible (f_perm = fy / FS) para garantizar que la estructura trabaje en un rango seguro, lejos de la falla.</li>
-                <li><strong>kgf vs kg:</strong> Se hace la distinción explícita de "kgf" (kilogramo-fuerza) para cargas, ya que el "kg" es unidad de masa. 1 kgf ≈ 9.81 N. Si ingresas "kg" o "lb", el sistema lo asume como masa y lo multiplica por la gravedad para obtener la fuerza real.</li>
+                <li><strong>Esfuerzo de Von Mises:</strong> Criterio de falla que combina esfuerzos normales (flexión) y cortantes. Es el método más preciso para acero ductil.</li>
+                <li><strong>Método de Macaulay:</strong> Técnica matemática basada en funciones de singularidad que permite resolver vigas con cualquier número de apoyos y cargas en una sola ecuación.</li>
+                <li><strong>Wx / Ix:</strong> Módulo resistente e Inercia. El sistema calcula los mínimos requeridos y busca en la base de datos el perfil más ligero que cumpla ambos.</li>
+                <li><strong>Factor de Seguridad (FS):</strong> Aplicado sobre el límite elástico (Fy). Un FS de 1.5 significa que el material trabajará al 66% de su capacidad.</li>
+                <li><strong>Convención de Signos:</strong> Cargas hacia abajo (-), Momentos Horarios (-). Reacciones y deflexiones siguen la física real del sistema.</li>
               </ul>
             </div>
           )}
 
           {activeTab === 'importancia' && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-slate-800">Importancia del Cálculo Estructural</h3>
-              <p>El diseño de vigas se rige por dos criterios fundamentales que este software evalúa simultáneamente:</p>
+              <h3 className="text-lg font-semibold text-slate-800">Integridad y Seguridad Estructural</h3>
+              <p>Beam Selector Pro no solo busca un perfil que "aguante", sino que optimiza el diseño bajo dos estados límite:</p>
               <ul className="list-disc pl-5 space-y-2">
-                <li><strong>Criterio de Resistencia (Estado Límite Último):</strong> Garantiza que la viga no se rompa ni sufra deformaciones permanentes bajo la carga máxima. Se verifica asegurando que el esfuerzo actuante sea menor al esfuerzo permisible (fy / FS). Esto se traduce en requerir un Módulo Resistente (Wx) mínimo.</li>
-                <li><strong>Criterio de Rigidez (Estado Límite de Servicio):</strong> Garantiza que la viga no se flexione (pandee) excesivamente, lo cual podría dañar acabados (como cielos rasos o vidrios) o causar incomodidad a los usuarios. Se verifica limitando la deflexión máxima a un valor fraccionario de la longitud (ej. L/250). Esto requiere un Momento de Inercia (Ix) mínimo.</li>
+                <li><strong>Estado Límite de Resistencia:</strong> Evita la falla por fluencia o rotura. El software verifica flexión pura, corte y el estado combinado de Von Mises.</li>
+                <li><strong>Estado Límite de Servicio (Deflexión):</strong> Controla que la viga no se "pandeé" excesivamente. Una viga puede ser resistente pero demasiado flexible, lo que causa daños en acabados o sensación de inseguridad.</li>
               </ul>
-              <p>El software selecciona el perfil <strong>más ligero</strong> que cumple con ambos criterios, optimizando así el costo del material sin comprometer la seguridad.</p>
+              <p className="bg-amber-50 p-3 rounded-lg border border-amber-100 text-amber-800 italic">
+                "La ingeniería es el arte de modelar materiales que no comprendemos del todo, en formas que no podemos analizar con precisión, para resistir fuerzas que no podemos predecir, de tal manera que el público no tenga motivos para sospechar de nuestra ignorancia."
+              </p>
             </div>
           )}
         </div>

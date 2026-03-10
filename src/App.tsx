@@ -8,6 +8,7 @@ import { Database, Calculator, Sun, Moon } from 'lucide-react';
 import DatabaseTab from './components/DatabaseTab';
 import CalculationTab from './components/CalculationTab';
 import EvidenceTab from './components/EvidenceTab';
+import InfoPopup from './components/InfoPopup';
 import { CalculationProvider, useCalculation } from './context/CalculationContext';
 import { FileText } from 'lucide-react';
 
@@ -38,7 +39,10 @@ function AppContent() {
       <header className="bg-slate-900 dark:bg-slate-950 text-white shadow-md">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2">
+            <div 
+              className="flex items-center gap-2 cursor-pointer" 
+              onClick={() => setActiveTab('calculation')}
+            >
               <div className="bg-amber-500 p-1.5 rounded-lg">
                 <Calculator size={24} className="text-white" />
               </div>
@@ -106,6 +110,7 @@ function AppContent() {
         <div className={`flex-1 flex flex-col ${activeTab === 'database' ? '' : 'hidden'}`}>
           <DatabaseTab />
         </div>
+        <InfoPopup />
       </main>
     </div>
   );
