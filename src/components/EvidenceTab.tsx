@@ -153,7 +153,7 @@ export default function EvidenceTab() {
                       {rc.type === 'force' ? 'Reacción Vertical' : 'Momento de Empotramiento'} en {formatLength(rc.x)}:
                     </span>
                     <span className="font-bold text-amber-600">
-                      {rc.type === 'force' ? formatForce(Math.abs(selectedProfile.reactions[idx])) : formatMoment(Math.abs(selectedProfile.reactions[idx]))}
+                      {rc.type === 'force' ? formatForce(selectedProfile.reactions[idx]) : formatMoment(selectedProfile.reactions[idx])}
                     </span>
                   </div>
                 ))}
@@ -346,7 +346,7 @@ export default function EvidenceTab() {
                       labelFormatter={(label) => `x = ${label} m`}
                     />
                     <ReferenceLine y={0} stroke="#64748b" strokeWidth={1} />
-                    <Area type="stepAfter" dataKey="V" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} />
+                    <Area type="linear" dataKey="V" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -365,7 +365,7 @@ export default function EvidenceTab() {
                       labelFormatter={(label) => `x = ${label} m`}
                     />
                     <ReferenceLine y={0} stroke="#64748b" strokeWidth={1} />
-                    <Area type="monotone" dataKey="M" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} />
+                    <Area type="linear" dataKey="M" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.1} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

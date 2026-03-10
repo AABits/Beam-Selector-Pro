@@ -8,7 +8,6 @@ import { Database, Calculator, Sun, Moon } from 'lucide-react';
 import DatabaseTab from './components/DatabaseTab';
 import CalculationTab from './components/CalculationTab';
 import EvidenceTab from './components/EvidenceTab';
-import InfoPopup from './components/InfoPopup';
 import { CalculationProvider, useCalculation } from './context/CalculationContext';
 import { FileText } from 'lucide-react';
 
@@ -107,7 +106,6 @@ function AppContent() {
         <div className={`flex-1 flex flex-col ${activeTab === 'database' ? '' : 'hidden'}`}>
           <DatabaseTab />
         </div>
-        <InfoPopup />
       </main>
     </div>
   );

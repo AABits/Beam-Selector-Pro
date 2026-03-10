@@ -220,7 +220,7 @@ export default function BeamVisualizer({
           const comp = reactionComponents[i];
           if (comp && comp.type === 'force') {
             const x = getX(comp.x, 'mm');
-            const isUp = r < 0; // Negative in solver means upward reaction
+            const isUp = r > 0; // Positive in solver means upward reaction
             const arrowYStart = isUp ? beamY + 60 : beamY - 60;
             const arrowYEnd = isUp ? beamY + 25 : beamY - 25;
             return (

@@ -5,7 +5,7 @@ import type { BeamType, BeamProfile, Material, AdvancedResult } from '../types';
 import FilterDropdown from './FilterDropdown';
 import ProfileCard from './ProfileCard';
 import { getBeamIcon } from '../utils/icons';
-import { convertLengthToMm, convertForceToN, convertDistributedLoadToNmm } from '../utils/units';
+import { convertLengthToMm, convertForceToN, convertDistributedLoadToNmm, convertMomentToNmm } from '../utils/units';
 import { useCalculation } from '../context/CalculationContext';
 import BeamVisualizer from './BeamVisualizer';
 
@@ -32,6 +32,7 @@ interface DistributedLoad {
 interface MomentLoad {
   id: string;
   magnitude: number;
+  unit: string;
   position: number;
   positionUnit: string;
   direction: 'ccw' | 'cw';
@@ -206,7 +207,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
     // Add self-weight as a distributed load if enabled
     let profileDistLoads = [...solverDistLoads];
     if (includeSelfWeight) {
-      const sw_Nmm = (p.p * 9.80665) / 1000;
+      const sw_Nmm = -(p.p * 9.80665) / 1000;
       profileDistLoads.push({
         w1: sw_Nmm,
         w2: sw_Nmm,
@@ -217,9 +218,9 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
 
     const profileResult = solveBeam(L_mm, solverPointLoads, profileDistLoads, solverSupports, solverMomentLoads);
 
-    const actualStress = profileResult.maxMoment / (p.wx * 1000);
+    const actualStress = Math.abs(profileResult.maxMoment) / (p.wx * 1000);
     const actualSF = fy_MPa / actualStress;
-    const actualDeflection = profileResult.maxDeflectionWithoutEI / (E_MPa * p.ix * 10000);
+    const actualDeflection = Math.abs(profileResult.maxDeflectionWithoutEI) / (E_MPa * p.ix * 10000);
 
     // Estimate Shear Area (Av)
     let av_mm2 = p.a * 100; // default to full area if unknown
@@ -235,7 +236,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
       av_mm2 = p.h * p.e; // Web area
     }
 
-    const shearStress = (profileResult.maxShear / av_mm2);
+    const shearStress = Math.abs(profileResult.maxShear) / av_mm2;
     const allowableShear = 0.6 * fy_MPa;
     const shearSF = allowableShear / shearStress;
 
@@ -323,13 +324,13 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
 
     // Prepare loads for solver
     const solverPointLoads = pointLoads.map(p => ({
-      P: convertForceToN(p.magnitude, p.unit) * (p.direction === 'up' ? -1 : 1),
+      P: convertForceToN(p.magnitude, p.unit) * (p.direction === 'up' ? 1 : -1),
       a: convertLengthToMm(p.position, p.positionUnit)
     }));
 
     const solverDistLoads = distributedLoads.map(d => ({
-      w1: convertDistributedLoadToNmm(d.magnitudeStart, d.unit) * (d.direction === 'up' ? -1 : 1),
-      w2: convertDistributedLoadToNmm(d.magnitudeEnd, d.unit) * (d.direction === 'up' ? -1 : 1),
+      w1: convertDistributedLoadToNmm(d.magnitudeStart, d.unit) * (d.direction === 'up' ? 1 : -1),
+      w2: convertDistributedLoadToNmm(d.magnitudeEnd, d.unit) * (d.direction === 'up' ? 1 : -1),
       x1: convertLengthToMm(d.startPosition, d.positionUnit),
       x2: convertLengthToMm(d.endPosition, d.positionUnit)
     }));
@@ -340,7 +341,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
     }));
 
     const solverMomentLoads = momentLoads.map(m => ({
-      M: Number(m.magnitude) * (m.direction === 'cw' ? -1 : 1) * 1000000, // Convert kN.m to N.mm
+      M: convertMomentToNmm(Number(m.magnitude), m.unit) * (m.direction === 'cw' ? -1 : 1),
       a: convertLengthToMm(m.position, m.positionUnit)
     }));
 
@@ -370,7 +371,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
     const refProfile = optimalProfile ? optimalProfile.profile : allProfiles.find(p => p.type_id === selectedTypeId);
 
     if (includeSelfWeight && refProfile) {
-      const sw_Nmm = (refProfile.p * 9.80665) / 1000;
+      const sw_Nmm = -(refProfile.p * 9.80665) / 1000;
       summaryDistLoads.push({
         w1: sw_Nmm,
         w2: sw_Nmm,
@@ -381,8 +382,8 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
 
     const solverResult = solveBeam(L_mm, solverPointLoads, summaryDistLoads, solverSupports, solverMomentLoads);
 
-    const reqWx_cm3 = (solverResult.maxMoment / allowableStress_MPa) / 1000;
-    const reqIx_cm4 = (solverResult.maxDeflectionWithoutEI / (E_MPa * allowDeflection_mm)) / 10000;
+    const reqWx_cm3 = (Math.abs(solverResult.maxMoment) / allowableStress_MPa) / 1000;
+    const reqIx_cm4 = (Math.abs(solverResult.maxDeflectionWithoutEI) / (E_MPa * allowDeflection_mm)) / 10000;
     const refIx = refProfile?.ix || 1;
 
     const calcResults = {
@@ -678,7 +679,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                               next[idx].direction = e.target.value as 'down' | 'up';
                               setPointLoads(next);
                             }}
-                            className="px-1 py-1 text-[10px] bg-slate-100 border border-r-0 border-slate-300 rounded-l"
+                            className="px-1 py-1 text-[10px] bg-slate-100 dark:bg-slate-700 border border-r-0 border-slate-300 dark:border-slate-600 rounded-l dark:text-white"
                           >
                             <option value="down">↓</option>
                             <option value="up">↑</option>
@@ -691,7 +692,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                               next[idx].magnitude = e.target.value === '' ? 0 : Number(e.target.value);
                               setPointLoads(next);
                             }}
-                            className="w-full px-2 py-1 text-xs border border-slate-300 focus:outline-none"
+                            className="w-full px-2 py-1 text-xs border border-slate-300 dark:border-slate-600 focus:outline-none dark:bg-slate-700 dark:text-white"
                           />
                           <select
                             value={p.unit}
@@ -700,7 +701,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                               next[idx].unit = e.target.value;
                               setPointLoads(next);
                             }}
-                            className="px-1 py-1 text-[10px] bg-slate-100 border border-l-0 border-slate-300 rounded-r"
+                            className="px-1 py-1 text-[10px] bg-slate-100 dark:bg-slate-700 border border-l-0 border-slate-300 dark:border-slate-600 rounded-r dark:text-white"
                           >
                             <option value="kN">kN</option>
                             <option value="N">N</option>
@@ -724,7 +725,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                               next[idx].position = e.target.value === '' ? 0 : Number(e.target.value);
                               setPointLoads(next);
                             }}
-                            className="w-full px-2 py-1 text-xs border border-slate-300 rounded-l focus:outline-none"
+                            className="w-full px-2 py-1 text-xs border border-slate-300 dark:border-slate-600 rounded-l focus:outline-none dark:bg-slate-700 dark:text-white"
                           />
                           <select
                             value={p.positionUnit}
@@ -733,7 +734,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                               next[idx].positionUnit = e.target.value;
                               setPointLoads(next);
                             }}
-                            className="px-1 py-1 text-[10px] bg-slate-100 border border-l-0 border-slate-300 rounded-r"
+                            className="px-1 py-1 text-[10px] bg-slate-100 dark:bg-slate-700 border border-l-0 border-slate-300 dark:border-slate-600 rounded-r dark:text-white"
                           >
                             <option value="m">m</option>
                             <option value="mm">mm</option>
@@ -774,7 +775,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                                 next[idx].direction = e.target.value as 'down' | 'up';
                                 setDistributedLoads(next);
                               }}
-                              className="px-1 py-1 text-[10px] bg-slate-100 border border-r-0 border-slate-300 rounded-l"
+                              className="px-1 py-1 text-[10px] bg-slate-100 dark:bg-slate-700 border border-r-0 border-slate-300 dark:border-slate-600 rounded-l dark:text-white"
                             >
                               <option value="down">↓</option>
                               <option value="up">↑</option>
@@ -787,7 +788,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                                 next[idx].magnitudeStart = e.target.value === '' ? 0 : Number(e.target.value);
                                 setDistributedLoads(next);
                               }}
-                              className="w-full px-2 py-1 text-xs border border-slate-300 focus:outline-none"
+                              className="w-full px-2 py-1 text-xs border border-slate-300 dark:border-slate-600 focus:outline-none dark:bg-slate-700 dark:text-white"
                             />
                             <select
                               value={d.unit}
@@ -796,7 +797,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                                 next[idx].unit = e.target.value;
                                 setDistributedLoads(next);
                               }}
-                              className="px-1 py-1 text-[10px] bg-slate-100 border border-l-0 border-slate-300 rounded-r"
+                              className="px-1 py-1 text-[10px] bg-slate-100 dark:bg-slate-700 border border-l-0 border-slate-300 dark:border-slate-600 rounded-r dark:text-white"
                             >
                               <option value="kN/m">kN/m</option>
                               <option value="N/m">N/m</option>
@@ -819,7 +820,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                               next[idx].magnitudeEnd = e.target.value === '' ? 0 : Number(e.target.value);
                               setDistributedLoads(next);
                             }}
-                            className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none"
+                            className="w-full px-2 py-1 text-xs border border-slate-300 dark:border-slate-600 rounded focus:outline-none dark:bg-slate-700 dark:text-white"
                           />
                         </div>
                       </div>
@@ -835,7 +836,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                                 next[idx].startPosition = e.target.value === '' ? 0 : Number(e.target.value);
                                 setDistributedLoads(next);
                               }}
-                              className="w-full px-2 py-1 text-xs border border-slate-300 rounded-l focus:outline-none"
+                              className="w-full px-2 py-1 text-xs border border-slate-300 dark:border-slate-600 rounded-l focus:outline-none dark:bg-slate-700 dark:text-white"
                             />
                             <select
                               value={d.positionUnit}
@@ -844,7 +845,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                                 next[idx].positionUnit = e.target.value;
                                 setDistributedLoads(next);
                               }}
-                              className="px-1 py-1 text-[10px] bg-slate-100 border border-l-0 border-slate-300 rounded-r"
+                              className="px-1 py-1 text-[10px] bg-slate-100 dark:bg-slate-700 border border-l-0 border-slate-300 dark:border-slate-600 rounded-r dark:text-white"
                             >
                               <option value="m">m</option>
                               <option value="mm">mm</option>
@@ -863,7 +864,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                               next[idx].endPosition = e.target.value === '' ? 0 : Number(e.target.value);
                               setDistributedLoads(next);
                             }}
-                            className="w-full px-2 py-1 text-xs border border-slate-300 rounded focus:outline-none"
+                            className="w-full px-2 py-1 text-xs border border-slate-300 dark:border-slate-600 rounded focus:outline-none dark:bg-slate-700 dark:text-white"
                           />
                         </div>
                       </div>
@@ -879,7 +880,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Momentos Puntuales</h3>
                 <button
-                  onClick={() => setMomentLoads([...momentLoads, { id: crypto.randomUUID(), magnitude: 0, position: 0, positionUnit: spanUnit, direction: 'ccw' }])}
+                  onClick={() => setMomentLoads([...momentLoads, { id: crypto.randomUUID(), magnitude: 0, unit: 'kN·m', position: 0, positionUnit: spanUnit, direction: 'ccw' }])}
                   className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center gap-1"
                 >
                   <Plus size={12} /> Añadir Momento

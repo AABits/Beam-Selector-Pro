@@ -52,3 +52,15 @@ export const convertStressToMPa = (value: number, unit: string) => {
     default: return value;
   }
 };
+
+export const convertMomentToNmm = (value: number, unit: string) => {
+  // N·mm
+  switch (unit) {
+    case 'N·mm': return value;
+    case 'N·m': return value * 1000;
+    case 'kN·m': return value * 1000000;
+    case 'kgf·m': return value * 9806.65;
+    case 'lbf·ft': return value * 1355.818;
+    default: return value;
+  }
+};
