@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit2, Save, X, Download } from 'lucide-react';
+import { Plus, Trash2, Edit2, Save, X, Download, Lock, Unlock } from 'lucide-react';
 import type { BeamType, BeamProfile, Material } from '../types';
 import { getBeamIcon } from '../utils/icons';
 
 export default function DatabaseTab() {
   const [activeTab, setActiveTab] = useState<'beams' | 'materials'>('beams');
+  const [adminPassword, setAdminPassword] = useState(localStorage.getItem('admin_password') || '');
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
   
   const [beamTypes, setBeamTypes] = useState<BeamType[]>([]);
   const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
@@ -43,6 +46,20 @@ export default function DatabaseTab() {
     }
   };
 
+  const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'x-admin-password': adminPassword
+  });
+
+  const handleAuthError = (res: Response) => {
+    if (res.status === 401) {
+      setIsAuthorized(false);
+      alert('No autorizado: La contraseña de administrador es incorrecta o no ha sido configurada.');
+      return true;
+    }
+    return false;
+  };
+
   const fetchMaterials = async () => {
     const res = await fetch('/api/materials');
     const data = await res.json();
@@ -60,9 +77,10 @@ export default function DatabaseTab() {
     if (!newTypeName.trim()) return;
     const res = await fetch('/api/beam-types', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify({ name: newTypeName.trim() }),
     });
+    if (handleAuthError(res)) return;
     if (res.ok) {
       setNewTypeName('');
       fetchTypes();
@@ -71,7 +89,11 @@ export default function DatabaseTab() {
 
   const handleDeleteType = async (id: number) => {
     if (!confirm('¿Estás seguro? Esto eliminará todos los perfiles de este tipo.')) return;
-    const res = await fetch(`/api/beam-types/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/beam-types/${id}`, { 
+      method: 'DELETE',
+      headers: { 'x-admin-password': adminPassword }
+    });
+    if (handleAuthError(res)) return;
     if (res.ok) {
       if (selectedTypeId === id) setSelectedTypeId(null);
       fetchTypes();
@@ -87,9 +109,10 @@ export default function DatabaseTab() {
     };
     const res = await fetch('/api/beam-profiles', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(newProfile),
     });
+    if (handleAuthError(res)) return;
     if (res.ok) {
       fetchProfiles(selectedTypeId);
     }
@@ -104,9 +127,10 @@ export default function DatabaseTab() {
     if (!editingProfileId) return;
     const res = await fetch(`/api/beam-profiles/${editingProfileId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(editForm),
     });
+    if (handleAuthError(res)) return;
     if (res.ok) {
       setEditingProfileId(null);
       if (selectedTypeId) fetchProfiles(selectedTypeId);
@@ -116,7 +140,11 @@ export default function DatabaseTab() {
   const handleDeleteProfile = async (id: number) => {
     if (!confirm('¿Eliminar este perfil?')) return;
     try {
-      const res = await fetch(`/api/beam-profiles/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/beam-profiles/${id}`, { 
+        method: 'DELETE',
+        headers: { 'x-admin-password': adminPassword }
+      });
+      if (handleAuthError(res)) return;
       if (res.ok) {
         if (selectedTypeId) fetchProfiles(selectedTypeId);
       } else {
@@ -137,9 +165,10 @@ export default function DatabaseTab() {
     if (!editingMaterialId) return;
     const res = await fetch(`/api/materials/${editingMaterialId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders(),
       body: JSON.stringify(editMaterialForm),
     });
+    if (handleAuthError(res)) return;
     if (res.ok) {
       setEditingMaterialId(null);
       fetchMaterials();
@@ -149,7 +178,11 @@ export default function DatabaseTab() {
   const handleDeleteMaterial = async (id: number) => {
     if (!confirm('¿Eliminar este material?')) return;
     try {
-      const res = await fetch(`/api/materials/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/materials/${id}`, { 
+        method: 'DELETE',
+        headers: { 'x-admin-password': adminPassword }
+      });
+      if (handleAuthError(res)) return;
       if (res.ok) {
         fetchMaterials();
       } else {
@@ -187,6 +220,38 @@ export default function DatabaseTab() {
     <div className="flex flex-col lg:flex-row h-full bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
       {/* Sidebar */}
       <div className="w-full lg:w-64 bg-slate-50 dark:bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-700 flex flex-col shrink-0">
+        <div className="p-3 border-b border-slate-200 dark:border-slate-700">
+          {!showPasswordInput ? (
+            <button
+              onClick={() => setShowPasswordInput(true)}
+              className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs font-semibold rounded border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+            >
+              {adminPassword ? <Unlock size={14} className="text-emerald-500" /> : <Lock size={14} />}
+              {adminPassword ? 'Modo Admin Activo' : 'Activar Modo Edición'}
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => {
+                  setAdminPassword(e.target.value);
+                  localStorage.setItem('admin_password', e.target.value);
+                }}
+                placeholder="Contraseña Admin"
+                className="w-full px-3 py-1.5 text-xs border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-slate-700 dark:text-white"
+                autoFocus
+              />
+              <button
+                onClick={() => setShowPasswordInput(false)}
+                className="w-full py-1 text-[10px] text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                Cerrar
+              </button>
+            </div>
+          )}
+        </div>
+
         <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex gap-2">
           <button
             onClick={() => setActiveTab('beams')}
@@ -267,9 +332,10 @@ export default function DatabaseTab() {
                 if (!newMaterialName.trim()) return;
                 const res = await fetch('/api/materials', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: getAuthHeaders(),
                   body: JSON.stringify({ name: newMaterialName.trim(), fy: 250, e: 200 })
                 });
+                if (handleAuthError(res)) return;
                 if (res.ok) {
                   fetchMaterials();
                   setNewMaterialName('');

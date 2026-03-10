@@ -32,6 +32,22 @@ const statements = {
   deleteMaterial: db.prepare('DELETE FROM materials WHERE id = ?'),
 };
 
+const authMiddleware = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    // If no password is set in environment, allow all for now (or block all?)
+    // Better to block if it's meant to be secure but not configured.
+    return next();
+  }
+  
+  const providedPassword = req.headers['x-admin-password'];
+  if (providedPassword === adminPassword) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Unauthorized: Invalid admin password' });
+  }
+};
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -47,7 +63,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/beam-types', (req, res) => {
+  app.post('/api/beam-types', authMiddleware, (req, res) => {
     const { name } = req.body;
     if (!name) return res.status(400).json({ error: 'Name is required' });
     try {
@@ -58,7 +74,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/beam-types/:id', (req, res) => {
+  app.delete('/api/beam-types/:id', authMiddleware, (req, res) => {
     try {
       statements.deleteBeamType.run(req.params.id);
       res.json({ success: true });
@@ -80,7 +96,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/beam-profiles', (req, res) => {
+  app.post('/api/beam-profiles', authMiddleware, (req, res) => {
     const { type_id, name, h, b, e, e1, a, ix, wx, iy, wy, p } = req.body;
     try {
       const info = statements.insertBeamProfile.run(type_id, name, h, b, e, e1, a, ix, wx, iy, wy, p);
@@ -90,7 +106,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/beam-profiles/:id', (req, res) => {
+  app.put('/api/beam-profiles/:id', authMiddleware, (req, res) => {
     const { id } = req.params;
     const { name, h, b, e, e1, a, ix, wx, iy, wy, p } = req.body;
     try {
@@ -101,7 +117,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/beam-profiles/:id', (req, res) => {
+  app.delete('/api/beam-profiles/:id', authMiddleware, (req, res) => {
     try {
       statements.deleteBeamProfile.run(req.params.id);
       res.json({ success: true });
@@ -118,7 +134,7 @@ async function startServer() {
     }
   });
 
-  app.post('/api/materials', (req, res) => {
+  app.post('/api/materials', authMiddleware, (req, res) => {
     const { name, fy, e } = req.body;
     try {
       const result = statements.insertMaterial.run(name, fy, e);
@@ -128,7 +144,7 @@ async function startServer() {
     }
   });
 
-  app.put('/api/materials/:id', (req, res) => {
+  app.put('/api/materials/:id', authMiddleware, (req, res) => {
     const { id } = req.params;
     const { name, fy, e } = req.body;
     try {
@@ -139,7 +155,7 @@ async function startServer() {
     }
   });
 
-  app.delete('/api/materials/:id', (req, res) => {
+  app.delete('/api/materials/:id', authMiddleware, (req, res) => {
     try {
       statements.deleteMaterial.run(req.params.id);
       res.json({ success: true });
