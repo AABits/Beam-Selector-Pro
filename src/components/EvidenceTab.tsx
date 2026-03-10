@@ -3,6 +3,7 @@ import { useCalculation } from '../context/CalculationContext';
 import { FileText, ArrowRight, CheckCircle2, AlertCircle, Info, TrendingUp, TrendingDown, Activity } from 'lucide-react';
 import BeamVisualizer from './BeamVisualizer';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Label } from 'recharts';
+import { convertMmToUnit } from '../utils/units';
 
 export default function EvidenceTab() {
   const { state } = useCalculation();
@@ -58,12 +59,10 @@ export default function EvidenceTab() {
   };
 
   const formatLength = (mm: number) => {
-    if (Math.abs(mm) >= 1000) {
-      return `${mm.toFixed(2)} mm (${(mm / 1000).toFixed(2)} m)`;
-    } else if (Math.abs(mm) >= 10) {
-      return `${mm.toFixed(2)} mm (${(mm / 10).toFixed(2)} cm)`;
-    }
-    return `${mm.toFixed(2)} mm`;
+    const unit = inputs.spanUnit;
+    const val = convertMmToUnit(mm, unit);
+    if (unit === 'mm') return `${val.toFixed(2)} mm`;
+    return `${val.toFixed(2)} ${unit} (${mm.toFixed(2)} mm)`;
   };
 
   return (
@@ -207,42 +206,42 @@ export default function EvidenceTab() {
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
               5. Requerimientos de Diseño
             </h2>
-            <div className="bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-800/50 p-5 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <div className="text-[10px] uppercase font-bold text-amber-700/70 dark:text-amber-400/70">Esfuerzo Admisible (Flexión)</div>
-                  <div className="text-sm font-bold text-amber-900 dark:text-amber-100">
-                    {inputs.material ? (inputs.material.fy / inputs.safetyFactor).toFixed(2) : 0} MPa
+            <div className="bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-800/50 p-5 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                  <div className="text-[10px] uppercase font-bold text-amber-700/70 dark:text-amber-400/70 mb-1">Esfuerzo Admisible (Flexión)</div>
+                  <div className="text-base font-bold text-amber-900 dark:text-amber-100">
+                    {inputs.material ? (inputs.material.fy / inputs.safetyFactor).toFixed(2) : 0} <span className="text-xs font-normal">MPa</span>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-[10px] uppercase font-bold text-amber-700/70 dark:text-amber-400/70">Esfuerzo Admisible (Corte)</div>
-                  <div className="text-sm font-bold text-amber-900 dark:text-amber-100">
-                    {inputs.material ? (0.6 * inputs.material.fy / inputs.safetyFactor).toFixed(2) : 0} MPa
+                <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-lg border border-amber-100 dark:border-amber-900/30">
+                  <div className="text-[10px] uppercase font-bold text-amber-700/70 dark:text-amber-400/70 mb-1">Esfuerzo Admisible (Corte)</div>
+                  <div className="text-base font-bold text-amber-900 dark:text-amber-100">
+                    {inputs.material ? (0.6 * inputs.material.fy / inputs.safetyFactor).toFixed(2) : 0} <span className="text-xs font-normal">MPa</span>
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <div className="text-[10px] uppercase font-bold text-amber-700/70 dark:text-amber-400/70">Deflexión Permisible</div>
-                  <div className="text-sm font-bold text-amber-900 dark:text-amber-100">
-                    {results.allowableDeflection.toFixed(2)} mm
+                <div className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-lg border border-amber-100 dark:border-amber-900/30 sm:col-span-2">
+                  <div className="text-[10px] uppercase font-bold text-amber-700/70 dark:text-amber-400/70 mb-1">Deflexión Permisible</div>
+                  <div className="text-base font-bold text-amber-900 dark:text-amber-100">
+                    {results.allowableDeflection.toFixed(2)} <span className="text-xs font-normal">mm</span>
                   </div>
                 </div>
               </div>
               
-              <div className="border-t border-amber-200/50 dark:border-amber-800/30 pt-4 space-y-3">
-                <div className="flex justify-between items-center">
+              <div className="border-t border-amber-200 dark:border-amber-800/50 pt-4 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                   <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-semibold text-sm">
-                    <ArrowRight size={16} />
-                    Módulo de Sección Requerido (Wx)
+                    <ArrowRight size={16} className="shrink-0" />
+                    <span className="truncate">Módulo de Sección Requerido (Wx)</span>
                   </div>
-                  <div className="text-lg font-bold text-amber-900 dark:text-amber-100">{results.reqWy.toFixed(2)} cm³</div>
+                  <div className="text-xl font-bold text-amber-900 dark:text-amber-100 shrink-0">{results.reqWy.toFixed(2)} <span className="text-xs font-normal">cm³</span></div>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
                   <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-semibold text-sm">
-                    <ArrowRight size={16} />
-                    Inercia Requerida (Ix)
+                    <ArrowRight size={16} className="shrink-0" />
+                    <span className="truncate">Inercia Requerida (Ix)</span>
                   </div>
-                  <div className="text-lg font-bold text-amber-900 dark:text-amber-100">{results.reqIy.toFixed(2)} cm⁴</div>
+                  <div className="text-xl font-bold text-amber-900 dark:text-amber-100 shrink-0">{results.reqIy.toFixed(2)} <span className="text-xs font-normal">cm⁴</span></div>
                 </div>
               </div>
             </div>

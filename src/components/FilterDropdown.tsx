@@ -68,12 +68,13 @@ export default function FilterDropdown({ options, selectedIds, onSelectionChange
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors text-sm text-slate-700 dark:text-slate-200"
+        className="flex items-center gap-2 px-2 sm:px-3 py-1.5 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors text-sm text-slate-700 dark:text-slate-200 shadow-sm"
       >
         <Filter size={16} />
-        <span>{label}</span>
+        <span className="hidden sm:inline">{label}</span>
+        <span className="sm:hidden">Filtrar</span>
         {selectedIds.size > 0 && (
-          <span className="bg-amber-100 text-amber-800 text-xs px-1.5 py-0.5 rounded-full font-medium">
+          <span className="bg-amber-100 text-amber-800 text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full font-bold">
             {selectedIds.size}
           </span>
         )}

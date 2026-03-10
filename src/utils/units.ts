@@ -64,3 +64,13 @@ export const convertMomentToNmm = (value: number, unit: string) => {
     default: return value;
   }
 };
+
+export const convertMmToUnit = (mm: number, unit: string) => {
+  switch (unit) {
+    case 'm': return mm / 1000;
+    case 'mm': return mm;
+    case 'in': return mm / 25.4;
+    case 'ft': return mm / 304.8;
+    default: return mm;
+  }
+};

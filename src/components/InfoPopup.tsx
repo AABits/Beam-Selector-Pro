@@ -9,7 +9,7 @@ export default function InfoPopup({ className }: { className?: string }) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className={className || "fixed bottom-6 left-6 w-12 h-12 bg-amber-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-amber-600 transition-colors z-50"}
+        className={className || "fixed bottom-6 left-6 w-10 h-10 sm:w-12 sm:h-12 bg-amber-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-amber-600 transition-colors z-50"}
         title="Información y Ayuda"
       >
         <Info size={24} />

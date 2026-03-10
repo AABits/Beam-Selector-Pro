@@ -184,9 +184,9 @@ export default function DatabaseTab() {
   const isTube = currentTypeName.includes('TUBO');
 
   return (
-    <div className="flex h-full bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-full bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
       {/* Sidebar */}
-      <div className="w-64 bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 flex flex-col">
+      <div className="w-full lg:w-64 bg-slate-50 dark:bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-700 flex flex-col shrink-0">
         <div className="p-2 border-b border-slate-200 dark:border-slate-700 flex gap-2">
           <button
             onClick={() => setActiveTab('beams')}
@@ -258,7 +258,7 @@ export default function DatabaseTab() {
       <div className="flex-1 flex flex-col overflow-hidden">
         {activeTab === 'materials' ? (
           <>
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800">
               <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
                 Materiales
               </h2>
@@ -274,210 +274,214 @@ export default function DatabaseTab() {
                   fetchMaterials();
                   setNewMaterialName('');
                 }
-              }} className="flex items-center gap-2">
+              }} className="flex items-center gap-2 w-full sm:w-auto">
                 <input
                   type="text"
                   value={newMaterialName}
                   onChange={e => setNewMaterialName(e.target.value)}
                   placeholder="Nombre del material..."
-                  className="w-64 px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-slate-700 dark:text-white"
+                  className="flex-1 sm:w-64 px-3 py-1.5 text-sm border border-slate-300 dark:border-slate-600 rounded focus:outline-none focus:ring-2 focus:ring-amber-500 dark:bg-slate-700 dark:text-white"
                 />
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 text-white text-sm font-medium rounded hover:bg-amber-600"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 text-white text-sm font-medium rounded hover:bg-amber-600 shrink-0"
                 >
-                  <Plus size={16} /> Agregar Material
+                  <Plus size={16} /> <span className="hidden sm:inline">Agregar Material</span>
                 </button>
               </form>
             </div>
             <div className="flex-1 overflow-auto p-4">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400">
-                    <th className="py-2 px-3 font-semibold">Nombre</th>
-                    <th className="py-2 px-3 font-semibold">fy (MPa)</th>
-                    <th className="py-2 px-3 font-semibold">E (GPa)</th>
-                    <th className="py-2 px-3 font-semibold text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm">
-                  {materials.map(material => {
-                    const isEditing = editingMaterialId === material.id;
-                    return (
-                      <tr key={material.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                        <td className="py-2 px-3">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editMaterialForm.name || ''}
-                              onChange={e => setEditMaterialForm({ ...editMaterialForm, name: e.target.value })}
-                              className="w-full px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
-                            />
-                          ) : (
-                            <span className="font-medium text-slate-800 dark:text-slate-200">{material.name}</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3">
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              value={editMaterialForm.fy || ''}
-                              onChange={e => setEditMaterialForm({ ...editMaterialForm, fy: parseFloat(e.target.value) || 0 })}
-                              className="w-24 px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
-                            />
-                          ) : (
-                            <span className="text-slate-600 dark:text-slate-400">{material.fy}</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3">
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              value={editMaterialForm.e || ''}
-                              onChange={e => setEditMaterialForm({ ...editMaterialForm, e: parseFloat(e.target.value) || 0 })}
-                              className="w-24 px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
-                            />
-                          ) : (
-                            <span className="text-slate-600 dark:text-slate-400">{material.e}</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          {isEditing ? (
-                            <div className="flex justify-end gap-2">
-                              <button onClick={handleSaveMaterial} className="text-emerald-600 hover:text-emerald-700">
-                                <Save size={16} />
-                              </button>
-                              <button onClick={() => setEditingMaterialId(null)} className="text-slate-400 hover:text-slate-600">
-                                <X size={16} />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => handleEditMaterial(material)} className="text-amber-600 hover:text-amber-800">
-                                <Edit2 size={16} />
-                              </button>
-                              <button onClick={() => handleDeleteMaterial(material.id)} className="text-red-500 hover:text-red-700">
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          )}
+              <div className="min-w-[600px]">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400">
+                      <th className="py-2 px-3 font-semibold">Nombre</th>
+                      <th className="py-2 px-3 font-semibold">fy (MPa)</th>
+                      <th className="py-2 px-3 font-semibold">E (GPa)</th>
+                      <th className="py-2 px-3 font-semibold text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {materials.map(material => {
+                      const isEditing = editingMaterialId === material.id;
+                      return (
+                        <tr key={material.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                          <td className="py-2 px-3">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editMaterialForm.name || ''}
+                                onChange={e => setEditMaterialForm({ ...editMaterialForm, name: e.target.value })}
+                                className="w-full px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
+                              />
+                            ) : (
+                              <span className="font-medium text-slate-800 dark:text-slate-200">{material.name}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                value={editMaterialForm.fy || ''}
+                                onChange={e => setEditMaterialForm({ ...editMaterialForm, fy: parseFloat(e.target.value) || 0 })}
+                                className="w-24 px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
+                              />
+                            ) : (
+                              <span className="text-slate-600 dark:text-slate-400">{material.fy}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3">
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                value={editMaterialForm.e || ''}
+                                onChange={e => setEditMaterialForm({ ...editMaterialForm, e: parseFloat(e.target.value) || 0 })}
+                                className="w-24 px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
+                              />
+                            ) : (
+                              <span className="text-slate-600 dark:text-slate-400">{material.e}</span>
+                            )}
+                          </td>
+                          <td className="py-2 px-3 text-right">
+                            {isEditing ? (
+                              <div className="flex justify-end gap-2">
+                                <button onClick={handleSaveMaterial} className="text-emerald-600 hover:text-emerald-700">
+                                  <Save size={16} />
+                                </button>
+                                <button onClick={() => setEditingMaterialId(null)} className="text-slate-400 hover:text-slate-600">
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex justify-end gap-2">
+                                <button onClick={() => handleEditMaterial(material)} className="text-amber-600 hover:text-amber-800">
+                                  <Edit2 size={16} />
+                                </button>
+                                <button onClick={() => handleDeleteMaterial(material.id)} className="text-red-500 hover:text-red-700">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {materials.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-slate-500">
+                          No se encontraron materiales.
                         </td>
                       </tr>
-                    );
-                  })}
-                  {materials.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-slate-500">
-                        No se encontraron materiales.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         ) : selectedTypeId ? (
           <>
-            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-800">
               <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
                 Perfiles para {beamTypes.find(t => t.id === selectedTypeId)?.name}
               </h2>
               <button
                 onClick={handleAddProfile}
-                className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 text-white text-sm font-medium rounded hover:bg-amber-600"
+                className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 text-white text-sm font-medium rounded hover:bg-amber-600 w-full sm:w-auto justify-center"
               >
                 <Plus size={16} /> Agregar Perfil
               </button>
             </div>
             <div className="flex-1 overflow-auto p-4">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400">
-                    <th className="py-2 px-3 font-semibold">Nombre</th>
-                    <th className="py-2 px-3 font-semibold">{isRound ? 'D (mm)' : 'h (mm)'}</th>
-                    <th className="py-2 px-3 font-semibold">{isRound ? '-' : 'b (mm)'}</th>
-                    <th className="py-2 px-3 font-semibold">{isTube ? 't (mm)' : 'e (mm)'}</th>
-                    <th className="py-2 px-3 font-semibold">{isTube ? '-' : 'e1 (mm)'}</th>
-                    <th className="py-2 px-3 font-semibold">A (cm²)</th>
-                    <th className="py-2 px-3 font-semibold">Ix (cm⁴)</th>
-                    <th className="py-2 px-3 font-semibold">Wx (cm³)</th>
-                    <th className="py-2 px-3 font-semibold">Iy (cm⁴)</th>
-                    <th className="py-2 px-3 font-semibold">Wy (cm³)</th>
-                    <th className="py-2 px-3 font-semibold">p (kg/m)</th>
-                    <th className="py-2 px-3 font-semibold text-right">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="text-sm">
-                  {profiles.map(profile => {
-                    const isEditing = editingProfileId === profile.id;
-                    return (
-                      <tr key={profile.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                        <td className="py-2 px-3">
-                          {isEditing ? (
-                            <input
-                              type="text"
-                              value={editForm.name || ''}
-                              onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                              className="w-full px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
-                            />
-                          ) : (
-                            <span className="font-medium text-slate-800 dark:text-slate-200">{profile.name}</span>
-                          )}
-                        </td>
-                        {['h', 'b', 'e', 'e1', 'a', 'ix', 'wx', 'iy', 'wy', 'p'].map((field) => {
-                          const isDisabled = (isRound && field === 'b') || (isTube && field === 'e1');
-                          return (
-                            <td key={field} className="py-2 px-3">
-                              {isEditing ? (
-                                !isDisabled ? (
-                                  <input
-                                    type="number"
-                                    value={editForm[field as keyof BeamProfile] || ''}
-                                    onChange={e => setEditForm({ ...editForm, [field]: parseFloat(e.target.value) || 0 })}
-                                    className="w-16 px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
-                                  />
+              <div className="min-w-[800px]">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-400">
+                      <th className="py-2 px-3 font-semibold">Nombre</th>
+                      <th className="py-2 px-3 font-semibold">{isRound ? 'D (mm)' : 'h (mm)'}</th>
+                      <th className="py-2 px-3 font-semibold">{isRound ? '-' : 'b (mm)'}</th>
+                      <th className="py-2 px-3 font-semibold">{isTube ? 't (mm)' : 'e (mm)'}</th>
+                      <th className="py-2 px-3 font-semibold">{isTube ? '-' : 'e1 (mm)'}</th>
+                      <th className="py-2 px-3 font-semibold">A (cm²)</th>
+                      <th className="py-2 px-3 font-semibold">Ix (cm⁴)</th>
+                      <th className="py-2 px-3 font-semibold">Wx (cm³)</th>
+                      <th className="py-2 px-3 font-semibold">Iy (cm⁴)</th>
+                      <th className="py-2 px-3 font-semibold">Wy (cm³)</th>
+                      <th className="py-2 px-3 font-semibold">p (kg/m)</th>
+                      <th className="py-2 px-3 font-semibold text-right">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {profiles.map(profile => {
+                      const isEditing = editingProfileId === profile.id;
+                      return (
+                        <tr key={profile.id} className="border-b border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                          <td className="py-2 px-3">
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editForm.name || ''}
+                                onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                                className="w-full px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
+                              />
+                            ) : (
+                              <span className="font-medium text-slate-800 dark:text-slate-200">{profile.name}</span>
+                            )}
+                          </td>
+                          {['h', 'b', 'e', 'e1', 'a', 'ix', 'wx', 'iy', 'wy', 'p'].map((field) => {
+                            const isDisabled = (isRound && field === 'b') || (isTube && field === 'e1');
+                            return (
+                              <td key={field} className="py-2 px-3">
+                                {isEditing ? (
+                                  !isDisabled ? (
+                                    <input
+                                      type="number"
+                                      value={editForm[field as keyof BeamProfile] || ''}
+                                      onChange={e => setEditForm({ ...editForm, [field]: parseFloat(e.target.value) || 0 })}
+                                      className="w-16 px-2 py-1 border dark:border-slate-600 rounded dark:bg-slate-700 dark:text-white"
+                                    />
+                                  ) : (
+                                    <span className="text-slate-300 dark:text-slate-600">-</span>
+                                  )
                                 ) : (
-                                  <span className="text-slate-300 dark:text-slate-600">-</span>
-                                )
-                              ) : (
-                                <span className="text-slate-600 dark:text-slate-400">{isDisabled ? '-' : profile[field as keyof BeamProfile]}</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                        <td className="py-2 px-3 text-right">
-                          {isEditing ? (
-                            <div className="flex justify-end gap-2">
-                              <button onClick={handleSaveProfile} className="text-emerald-600 hover:text-emerald-700">
-                                <Save size={16} />
-                              </button>
-                              <button onClick={() => setEditingProfileId(null)} className="text-slate-400 hover:text-slate-600">
-                                <X size={16} />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-end gap-2">
-                              <button onClick={() => handleEditProfile(profile)} className="text-amber-600 hover:text-amber-800">
-                                <Edit2 size={16} />
-                              </button>
-                              <button onClick={() => handleDeleteProfile(profile.id)} className="text-red-500 hover:text-red-700">
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          )}
+                                  <span className="text-slate-600 dark:text-slate-400">{isDisabled ? '-' : profile[field as keyof BeamProfile]}</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="py-2 px-3 text-right">
+                            {isEditing ? (
+                              <div className="flex justify-end gap-2">
+                                <button onClick={handleSaveProfile} className="text-emerald-600 hover:text-emerald-700">
+                                  <Save size={16} />
+                                </button>
+                                <button onClick={() => setEditingProfileId(null)} className="text-slate-400 hover:text-slate-600">
+                                  <X size={16} />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex justify-end gap-2">
+                                <button onClick={() => handleEditProfile(profile)} className="text-amber-600 hover:text-amber-800">
+                                  <Edit2 size={16} />
+                                </button>
+                                <button onClick={() => handleDeleteProfile(profile.id)} className="text-red-500 hover:text-red-700">
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {profiles.length === 0 && (
+                      <tr>
+                        <td colSpan={12} className="py-8 text-center text-slate-500">
+                          No se encontraron perfiles. Agrega uno para comenzar.
                         </td>
                       </tr>
-                    );
-                  })}
-                  {profiles.length === 0 && (
-                    <tr>
-                      <td colSpan={12} className="py-8 text-center text-slate-500">
-                        No se encontraron perfiles. Agrega uno para comenzar.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         ) : (

@@ -467,9 +467,9 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
   };
 
   return (
-    <div className="flex gap-6 h-full">
+    <div className="flex flex-col lg:flex-row gap-6 h-full">
       {/* Left Column */}
-      <div className="w-[420px] min-w-[420px] flex flex-col gap-4 overflow-hidden">
+      <div className="w-full lg:w-[420px] lg:min-w-[420px] flex flex-col gap-4 overflow-hidden shrink-0">
         
         {/* Previsualización de Cargas */}
         <div className="bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-4 shrink-0">
@@ -1018,16 +1018,16 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
             <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3 group">
               <button
                 onClick={handleReset}
-                className="bg-red-500 text-white w-12 h-12 rounded-full shadow-lg opacity-0 pointer-events-none translate-y-2 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 transition-all duration-200 hover:bg-red-600 flex items-center justify-center"
+                className="bg-red-500 text-white w-10 h-10 sm:w-12 sm:h-12 rounded-full shadow-lg opacity-0 sm:opacity-0 pointer-events-none translate-y-2 group-hover:opacity-100 group-hover:pointer-events-auto group-hover:translate-y-0 transition-all duration-200 hover:bg-red-600 flex items-center justify-center"
                 title="Reiniciar cálculos"
               >
-                <RotateCw size={24} />
+                <RotateCw size={20} className="sm:w-6 sm:h-6" />
               </button>
               <button
                 onClick={handleCalculate}
-                className="bg-amber-500 text-white font-bold py-3 px-8 rounded-full hover:bg-amber-600 transition-all shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2"
+                className="bg-amber-500 text-white font-bold py-2 px-6 sm:py-3 sm:px-8 rounded-full hover:bg-amber-600 transition-all shadow-xl hover:scale-105 active:scale-95 flex items-center gap-2 text-sm sm:text-base"
               >
-                <Calculator size={20} />
+                <Calculator size={18} className="sm:w-5 sm:h-5" />
                 Calcular
               </button>
             </div>
@@ -1045,31 +1045,31 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
       )}
 
       {/* Results Panel */}
-      <div className="flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-5 overflow-hidden flex flex-col h-full">
+      <div className="flex-1 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700 p-3 sm:p-5 overflow-hidden flex flex-col h-full min-h-[400px]">
         <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-4 border-b dark:border-slate-700 pb-2">Resultados</h2>
         
         {results ? (
-          <div className="flex flex-col h-full overflow-y-auto pr-2 pb-20">
-            <div className="grid grid-cols-5 gap-4 mb-6">
-              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
-                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Momento Máx</div>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{(results.selectedProfile?.maxMoment || results.maxMoment).toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">kN·m</span></div>
+          <div className="flex-1 flex flex-col overflow-y-auto pr-1 sm:pr-2 pb-20">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6">
+              <div className="bg-slate-50 dark:bg-slate-700/50 p-3 sm:p-4 rounded-lg border border-slate-100 dark:border-slate-600">
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1">Momento Máx</div>
+                <div className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100">{(results.selectedProfile?.maxMoment || results.maxMoment).toFixed(2)} <span className="text-xs sm:text-sm font-normal text-slate-500 dark:text-slate-400">kN·m</span></div>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
-                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Cortante Máx</div>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{(results.selectedProfile?.maxShear || results.maxShear || 0).toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">kN</span></div>
+              <div className="bg-slate-50 dark:bg-slate-700/50 p-3 sm:p-4 rounded-lg border border-slate-100 dark:border-slate-600">
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1">Cortante Máx</div>
+                <div className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100">{(results.selectedProfile?.maxShear || results.maxShear || 0).toFixed(2)} <span className="text-xs sm:text-sm font-normal text-slate-500 dark:text-slate-400">kN</span></div>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
-                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Wx Requerido</div>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{results.reqWy.toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">cm³</span></div>
+              <div className="bg-slate-50 dark:bg-slate-700/50 p-3 sm:p-4 rounded-lg border border-slate-100 dark:border-slate-600">
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1">Wx Requerido</div>
+                <div className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100">{results.reqWy.toFixed(2)} <span className="text-xs sm:text-sm font-normal text-slate-500 dark:text-slate-400">cm³</span></div>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
-                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Ix Requerido</div>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{results.reqIy.toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">cm⁴</span></div>
+              <div className="bg-slate-50 dark:bg-slate-700/50 p-3 sm:p-4 rounded-lg border border-slate-100 dark:border-slate-600">
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1">Ix Requerido</div>
+                <div className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100">{results.reqIy.toFixed(2)} <span className="text-xs sm:text-sm font-normal text-slate-500 dark:text-slate-400">cm⁴</span></div>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-lg border border-slate-100 dark:border-slate-600">
-                <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Deflexión Permisible</div>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{results.allowableDeflection.toFixed(2)} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">mm</span></div>
+              <div className="bg-slate-50 dark:bg-slate-700/50 p-3 sm:p-4 rounded-lg border border-slate-100 dark:border-slate-600">
+                <div className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-1">Deflexión Permisible</div>
+                <div className="text-lg sm:text-xl font-bold text-slate-800 dark:text-slate-100">{results.allowableDeflection.toFixed(2)} <span className="text-xs sm:text-sm font-normal text-slate-500 dark:text-slate-400">mm</span></div>
               </div>
             </div>
 
@@ -1080,7 +1080,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
             </div>
             <div className="mb-6">
               {results.suitableProfiles.length > 0 ? (
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-2 p-1">
+                <div className="space-y-3 max-h-[500px] lg:max-h-80 overflow-y-auto pr-2 p-1">
                   {results.suitableProfiles
                     .map((res, index) => (
                     <div key={res.profile.id}>
@@ -1115,7 +1115,7 @@ export default function CalculationTab({ onGoToEvidence }: CalculationTabProps) 
                     />
                   </div>
                 </div>
-                <div className="space-y-3 max-h-80 overflow-y-auto pr-2 p-1">
+                <div className="space-y-3 max-h-[500px] lg:max-h-80 overflow-y-auto pr-2 p-1">
                   {(() => {
                     let displayedSuggestions = [];
                     if (selectedSuggestionTypes.size === 0) {

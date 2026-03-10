@@ -136,15 +136,43 @@ export function solveBeam(
   const C1 = X[numReactions];
   const C2 = X[numReactions + 1];
 
-  // 3. Generate points
+  // 3. Generate points (include critical points to catch jumps)
+  const criticalPoints = new Set<number>([0, L]);
+  for (const s of supports) criticalPoints.add(s.x);
+  for (const pl of pointLoads) criticalPoints.add(pl.a);
+  for (const ml of momentLoads) criticalPoints.add(ml.a);
+  for (const dl of distributedLoads) {
+    criticalPoints.add(dl.x1);
+    criticalPoints.add(dl.x2);
+  }
+
   const N = 500;
+  const evaluationPoints = Array.from(criticalPoints).sort((a, b) => a - b);
+  
+  // Add intermediate points
+  for (let i = 0; i < N; i++) {
+    evaluationPoints.push((i / N) * L);
+  }
+  evaluationPoints.sort((a, b) => a - b);
+
   const points: { x: number, V: number, M: number, EI_v: number }[] = [];
   let max_M = 0; let max_MX = 0;
   let max_V = 0; let max_VX = 0;
   let max_EI_v = 0; let max_EI_vX = 0;
 
-  for (let i = 0; i <= N; i++) {
-    const x = (i / N) * L;
+  // To handle discontinuities, evaluate slightly before and after critical points
+  const finalPoints: number[] = [];
+  for (const x of evaluationPoints) {
+    finalPoints.push(x);
+    if (criticalPoints.has(x)) {
+      if (x > 0) finalPoints.push(x - 1e-6);
+      if (x < L) finalPoints.push(x + 1e-6);
+    }
+  }
+  finalPoints.sort((a, b) => a - b);
+
+  for (const x of finalPoints) {
+    if (x < 0 || x > L) continue;
     let V = 0;
     let M = 0;
     let EI_v = C1 * x + C2;
@@ -193,9 +221,23 @@ export function solveBeam(
       }
     }
 
-    points.push({ x, V, M, EI_v });
+    // Only add unique x to points for charting
+    if (points.length === 0 || Math.abs(points[points.length - 1].x - x) > 1e-5) {
+      points.push({ x, V, M, EI_v });
+    }
+
+    const absV = Math.abs(V);
+    const absMaxV = Math.abs(max_V);
+    if (absV > absMaxV + 1e-7) { 
+      max_V = V; 
+      max_VX = x; 
+    } else if (Math.abs(absV - absMaxV) < 1e-7 && V > max_V) {
+      // Prefer positive shear if magnitudes are equal
+      max_V = V;
+      max_VX = x;
+    }
+
     if (Math.abs(M) > Math.abs(max_M)) { max_M = M; max_MX = x; }
-    if (Math.abs(V) > Math.abs(max_V)) { max_V = V; max_VX = x; }
     if (Math.abs(EI_v) > Math.abs(max_EI_v)) { max_EI_v = EI_v; max_EI_vX = x; }
   }
 
